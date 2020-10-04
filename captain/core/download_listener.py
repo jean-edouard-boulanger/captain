@@ -1,6 +1,4 @@
-from .download_metadata import DownloadMetadata
-from .download_handle import DownloadHandle
-from .error_info import ErrorInfo
+from .download_entities import DownloadMetadata, ErrorInfo, DownloadHandle
 
 from datetime import datetime
 from typing import Protocol
