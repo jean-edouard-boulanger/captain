@@ -21,7 +21,7 @@ import os
 
 sio = socketio.AsyncServer(async_mode='aiohttp', cors_allowed_origins='*')
 
-logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
+logging.basicConfig(stream=sys.stdout, level=logging.INFO)
 logger = logging.getLogger("ws")
 
 os.environ["PYTHONWARNINGS"] = "ignore:Unverified HTTPS request"
