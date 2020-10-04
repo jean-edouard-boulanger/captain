@@ -14,12 +14,12 @@ export default function NotConnected({connection}) {
           Not connected to Captain server ({connection})
         </Typography>
         <Typography variant="body1">
-          <p>We were unable to connect to Captain server, there are a few reasons why this could be:</p>
-          <ul>
-            <li>Is it currently running?</li>
-            <li>Is it properly configured?</li>
-          </ul>
+          We were unable to connect to Captain server, there are a few reasons why this could be:
         </Typography>
+        <ul>
+          <li>Is it currently running?</li>
+          <li>Is it properly configured?</li>
+        </ul>
       </CardContent>
     </Card>
   );

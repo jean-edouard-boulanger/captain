@@ -58,8 +58,8 @@ export default function DownloadsTable(props) {
         <TableHead>
           <TableRow>
             <TableCell>File name</TableCell>
-            <TableCell>Progress</TableCell>
-            <TableCell>&nbsp;</TableCell>
+            <TableCell style={{minWidth: 200}}>Progress</TableCell>
+            <TableCell style={{minWidth: 100}}>&nbsp;</TableCell>
             <TableCell>Status</TableCell>
             <TableCell>&nbsp;</TableCell>
           </TableRow>
