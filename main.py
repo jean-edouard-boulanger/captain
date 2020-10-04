@@ -35,8 +35,8 @@ async def main_loop(emit: Callable):
     while True:
         logger.info("starting download")
         await emit("start_download", {
-            "remoteFileUrl": DOWNLOAD_URL,
-            "localDir": "/Users/jboulanger/Downloads",
+            "remote_file_url": DOWNLOAD_URL,
+            "local_dir": "/Users/jboulanger/Downloads",
             "auth": {
                 "basic": {
                     "username": "jboulanger",

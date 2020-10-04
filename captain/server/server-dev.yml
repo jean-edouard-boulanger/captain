@@ -1,3 +1,6 @@
 temp_download_dir: /tmp
 default_download_dir: ~/Downloads
 shutdown_timeout: 10
+persistence_type: IN_MEMORY
+persistence_settings:
+  persist_file_path: ~/.captain/db.json

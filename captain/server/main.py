@@ -60,11 +60,11 @@ class DownloadManagerEventConsumer(DownloadManagerObserverBase):
         self._loop = event_loop
 
     def handle_event(self, event: DownloadManagerEvent):
-        try:
-            self._loop.call_soon_threadsafe(
-                self._queue.put_nowait, event)
-        except Exception as e:
-            logger.warning(f"failed to put event on the queue: {e}\n{traceback.format_exc()}")
+        if self._loop.is_closed():
+            logger.warning("event loop is closed, not putting download manager event")
+            return
+        self._loop.call_soon_threadsafe(
+            self._queue.put_nowait, event)
 
 
 async def sio_publisher(shared_queue: Queue, emit: Callable):

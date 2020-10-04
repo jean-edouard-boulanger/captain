@@ -57,8 +57,8 @@ function makeController(socket) {
         return auth;
       }
       socket.emit("start_download", {
-        remoteFileUrl: data.remoteFileUrl,
-        localDir: data.localDir,
+        remote_file_url: data.remoteFileUrl,
+        local_dir: data.localDir,
         auth: makeAuth()
       });
     }
