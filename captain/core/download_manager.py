@@ -121,18 +121,21 @@ class _Entry:
 class DownloadManagerSettings:
     temp_download_dir: Path
     default_download_dir: Path
+    shutdown_timeout: timedelta
 
     def serialize(self) -> Dict:
         return {
             "temp_download_dir": str(self.temp_download_dir.absolute()),
-            "default_download_dir": str(self.default_download_dir.absolute())
+            "default_download_dir": str(self.default_download_dir.absolute()),
+            "shutdown_timeout": self.shutdown_timeout.total_seconds()
         }
 
     @staticmethod
     def deserialize(data) -> "DownloadManagerSettings":
         return DownloadManagerSettings(
             temp_download_dir=Path(data["temp_download_dir"]).expanduser(),
-            default_download_dir=Path(data["default_download_dir"]).expanduser()
+            default_download_dir=Path(data["default_download_dir"]).expanduser(),
+            shutdown_timeout=timedelta(seconds=data.get("shutdown_timeout", 10))
         )
 
 
@@ -502,14 +505,6 @@ class DownloadManager(DownloadListenerBase):
             return request.future_result.get()
         return request.future_result
 
-    def _teardown(self):
-        logger.info("stopping all outstanding tasks")
-        for task in self._entries.values():
-            if task.task:
-                logger.info(f"stopping task: {task.handle}")
-                task.task.stop()
-                task.task.join()
-
     def _stop_outstanding_tasks(self):
         for entry in self._entries.values():
             if entry.state.can_be_paused:
@@ -527,16 +522,20 @@ class DownloadManager(DownloadListenerBase):
                                        " public interface is disabled")
 
     def _request_loop(self):
-        shutdown_requested = False
+        shutdown_at: Optional[datetime] = None
         while True:
-            if self._stop_flag.is_set() and not shutdown_requested:
+            if self._stop_flag.is_set() and shutdown_at is None:
                 logger.info("shutdown requested, stopping all outstanding tasks")
                 self._stop_outstanding_tasks()
-                shutdown_requested = True
-            elif self._stop_flag.is_set() and shutdown_requested:
+                shutdown_at = datetime.now() + self._settings.shutdown_timeout
+                logger.info(f"will force shutdown at {shutdown_at}")
+            elif self._stop_flag.is_set() and shutdown_at is not None:
                 all_inactive = all(entry.state.is_inactive for entry in self._entries.values())
                 if all_inactive:
                     logger.info("all tasks inactive, leaving request loop")
+                    return
+                if datetime.now() >= shutdown_at:
+                    logger.info("shutdown timeout expired, leaving forcefully")
                     return
             request: Optional[_Request] = _pop_queue(self._requests, timedelta(milliseconds=500))
             if request is None:
@@ -563,4 +562,3 @@ class DownloadManager(DownloadListenerBase):
 
     def run(self):
         self._request_loop()
-        self._teardown()
