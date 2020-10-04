@@ -55,6 +55,10 @@ class _DownloadState:
         }
 
     @property
+    def is_inactive(self):
+        return self.is_final or self.status == _DownloadStatus.PAUSED
+
+    @property
     def can_be_resumed(self):
         return (self.status == _DownloadStatus.PAUSED
                 and self.requested_status is None
@@ -86,6 +90,7 @@ class _DownloadState:
             "error_info": self.error_info.serialize() if self.error_info else None,
             "properties": {
                 "is_final": self.is_final,
+                "is_inactive": self.is_inactive,
                 "can_be_resumed": self.can_be_resumed,
                 "can_be_paused": self.can_be_paused,
                 "can_be_stopped": self.can_be_stopped,
@@ -251,6 +256,7 @@ class DownloadManager(DownloadListenerBase):
     def start_download(self,
                        request: DownloadRequest,
                        blocking: Optional[bool] = False):
+        self._check_takes_requests()
         return self._queue_request(
             self._handle_start_download,
             args=(request, ), blocking=blocking)
@@ -258,6 +264,7 @@ class DownloadManager(DownloadListenerBase):
     def stop_download(self,
                       handle: DownloadHandle,
                       blocking: Optional[bool] = False):
+        self._check_takes_requests()
         return self._queue_request(
             self._handle_stop_download,
             args=(handle, ), blocking=blocking)
@@ -265,6 +272,7 @@ class DownloadManager(DownloadListenerBase):
     def pause_download(self,
                        handle: DownloadHandle,
                        blocking: Optional[bool] = False):
+        self._check_takes_requests()
         return self._queue_request(
             self._handle_pause_download,
             args=(handle, ), blocking=blocking)
@@ -272,6 +280,7 @@ class DownloadManager(DownloadListenerBase):
     def resume_download(self,
                         handle: DownloadHandle,
                         blocking: Optional[bool] = False):
+        self._check_takes_requests()
         return self._queue_request(
             self._handle_resume_download,
             args=(handle, ), blocking=blocking)
@@ -279,6 +288,7 @@ class DownloadManager(DownloadListenerBase):
     def remove_download(self,
                         handle: DownloadHandle,
                         blocking: Optional[bool] = False):
+        self._check_takes_requests()
         return self._queue_request(
             self._handle_remove_download,
             args=(handle, ), blocking=blocking)
@@ -286,12 +296,14 @@ class DownloadManager(DownloadListenerBase):
     def get_download(self,
                      handle: DownloadHandle,
                      blocking: Optional[bool] = False):
+        self._check_takes_requests()
         return self._queue_request(
             self._handle_get_download,
             args=(handle, ), blocking=blocking)
 
     def get_downloads(self,
                       blocking: Optional[bool] = False):
+        self._check_takes_requests()
         return self._queue_request(
             self._handle_get_downloads,
             blocking=blocking)
@@ -299,9 +311,14 @@ class DownloadManager(DownloadListenerBase):
     def retry_download(self,
                        handle: DownloadHandle,
                        blocking: Optional[bool] = False):
+        self._check_takes_requests()
         return self._queue_request(
             self._handle_retry_download,
             args=(handle, ), blocking=blocking)
+
+    def add_observer(self, observer: DownloadManagerObserverBase):
+        self._check_takes_requests()
+        self._observers.append(observer)
 
     def _handle_start_download(self, request: DownloadRequest) -> DownloadHandle:
         handle = DownloadHandle.make()
@@ -493,8 +510,34 @@ class DownloadManager(DownloadListenerBase):
                 task.task.stop()
                 task.task.join()
 
+    def _stop_outstanding_tasks(self):
+        for entry in self._entries.values():
+            if entry.state.can_be_paused:
+                logger.info(f"pausing task {entry.handle}")
+                self._queue_request(self._handle_pause_download, args=(entry.handle, ))
+            elif entry.state.can_be_stopped:
+                logger.info(f"stopping task {entry.handle}")
+                self._queue_request(self._handle_stop_download, args=(entry.handle, ))
+            else:
+                invariant(entry.state.is_final)
+
+    def _check_takes_requests(self):
+        if self._stop_flag.is_set():
+            raise DownloadManagerError("download manager is stopping,"
+                                       " public interface is disabled")
+
     def _request_loop(self):
-        while not self._stop_flag.is_set():
+        shutdown_requested = False
+        while True:
+            if self._stop_flag.is_set() and not shutdown_requested:
+                logger.info("shutdown requested, stopping all outstanding tasks")
+                self._stop_outstanding_tasks()
+                shutdown_requested = True
+            elif self._stop_flag.is_set() and shutdown_requested:
+                all_inactive = all(entry.state.is_inactive for entry in self._entries.values())
+                if all_inactive:
+                    logger.info("all tasks inactive, leaving request loop")
+                    return
             request: Optional[_Request] = _pop_queue(self._requests, timedelta(milliseconds=500))
             if request is None:
                 continue
@@ -513,9 +556,6 @@ class DownloadManager(DownloadListenerBase):
     def _notify_observers(self, *args, **kwargs):
         for observer in self._observers:
             observer.handle_event(DownloadManagerEvent(*args, **kwargs))
-
-    def add_observer(self, observer: DownloadManagerObserverBase):
-        self._observers.append(observer)
 
     def stop(self):
         logger.info("stopping download manager")

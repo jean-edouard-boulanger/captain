@@ -10,18 +10,21 @@ from typing import Callable
 from asyncio import Queue
 from aiohttp import web
 import yaml
+import traceback
 import argparse
 import threading
 import asyncio
 import socketio
 import logging
 import sys
-
+import os
 
 sio = socketio.AsyncServer(async_mode='aiohttp', cors_allowed_origins='*')
 
-logging.basicConfig(stream=sys.stdout, level=logging.INFO)
+logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
 logger = logging.getLogger("ws")
+
+os.environ["PYTHONWARNINGS"] = "ignore:Unverified HTTPS request"
 
 
 def get_manager() -> DownloadManager:
@@ -42,6 +45,11 @@ def start_manager():
     get_manager.manager_thread.start()
 
 
+def stop_manager():
+    get_manager.manager.stop()
+    get_manager.manager_thread.join()
+
+
 get_manager.manager = None
 get_manager.manager_thread = None
 
@@ -52,8 +60,11 @@ class DownloadManagerEventConsumer(DownloadManagerObserverBase):
         self._loop = event_loop
 
     def handle_event(self, event: DownloadManagerEvent):
-        self._loop.call_soon_threadsafe(
-            self._queue.put_nowait, event)
+        try:
+            self._loop.call_soon_threadsafe(
+                self._queue.put_nowait, event)
+        except Exception as e:
+            logger.warning(f"failed to put event on the queue: {e}\n{traceback.format_exc()}")
 
 
 async def sio_publisher(shared_queue: Queue, emit: Callable):
@@ -142,7 +153,13 @@ def main():
     sio.attach(app)
     sio.start_background_task(sio_publisher, shared_queue, sio.emit)
     logger.info("publisher started")
-    web.run_app(app, host='127.0.0.1', port=3001, access_log=None)
+    web.run_app(app,
+                host='127.0.0.1', port=3001,
+                access_log=None,
+                handle_signals=True)
+    logger.info("stopping download manager")
+    stop_manager()
+    logger.info("leaving")
 
 
 if __name__ == "__main__":
