@@ -1,5 +1,13 @@
 temp_download_dir: /tmp
-default_download_dir: ~/Downloads
+download_directories:
+  - directory: ~/Downloads
+    label: Downloads
+  - directory: ~/Music
+    label: Music
+  - directory: ~/Movies
+    label: Movies
+  - directory: ~/Documents
+    label: Documents
 shutdown_timeout: 10
 persistence_type: IN_MEMORY
 persistence_settings:

@@ -33,9 +33,30 @@ logger = logging.getLogger("manager")
 
 
 @dataclass
+class DownloadDirectory:
+    directory: Path
+    label: str
+
+    def serialize(self):
+        return {
+            "directory": str(self.directory),
+            "label": self.label
+        }
+
+    @staticmethod
+    def deserialize(data: Optional[Dict]) -> Optional["DownloadDirectory"]:
+        if data is None:
+            return None
+        return DownloadDirectory(
+            directory=Path(data["directory"]).expanduser(),
+            label=data["label"]
+        )
+
+
+@dataclass
 class DownloadManagerSettings:
     temp_download_dir: Path
-    default_download_dir: Path
+    download_directories: List[DownloadDirectory]
     shutdown_timeout: timedelta
     persistence_type: PersistenceType
     persistence_settings: Dict
@@ -43,7 +64,7 @@ class DownloadManagerSettings:
     def serialize(self) -> Dict:
         return {
             "temp_download_dir": str(self.temp_download_dir.absolute()),
-            "default_download_dir": str(self.default_download_dir.absolute()),
+            "download_directories": [dd.serialize() for dd in self.download_directories],
             "shutdown_timeout": self.shutdown_timeout.total_seconds(),
             "persistence_type": str(self.persistence_type),
             "persistence_settings": self.persistence_settings
@@ -53,7 +74,7 @@ class DownloadManagerSettings:
     def deserialize(data) -> "DownloadManagerSettings":
         return DownloadManagerSettings(
             temp_download_dir=Path(data.get("temp_download_dir", "/tmp")).expanduser(),
-            default_download_dir=Path(data["default_download_dir"]).expanduser(),
+            download_directories=[DownloadDirectory.deserialize(item) for item in data["download_directories"]],
             shutdown_timeout=timedelta(seconds=data.get("shutdown_timeout", 10)),
             persistence_type=PersistenceType[data.get("persistence_type", "IN_MEMORY")],
             persistence_settings=data.get("persistence_settings", {})
