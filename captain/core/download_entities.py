@@ -134,13 +134,15 @@ class DownloadMetadata:
     remote_file_name: str
     file_size: Optional[int] = None
     file_type: Optional[str] = None
+    accept_ranges: Optional[bool] = None
 
     def serialize(self):
         return {
             "remote_url": self.remote_url,
             "remote_file_name": self.remote_file_name,
             "file_size": self.file_size,
-            "file_type": self.file_type
+            "file_type": self.file_type,
+            "accept_ranges": self.accept_ranges
         }
 
     @staticmethod
@@ -151,7 +153,8 @@ class DownloadMetadata:
             remote_url=data["remote_url"],
             remote_file_name=data["remote_file_name"],
             file_size=int(data["file_size"]),
-            file_type=data["file_type"])
+            file_type=data["file_type"],
+            accept_ranges=data["accept_ranges"])
 
 
 @dataclass
@@ -188,7 +191,9 @@ class DownloadState:
     @property
     def can_be_paused(self):
         return (self.status == DownloadStatus.ACTIVE
-                and self.requested_status is None)
+                and self.requested_status is None
+                and self.metadata is not None
+                and self.metadata.accept_ranges)
 
     @property
     def can_be_stopped(self):

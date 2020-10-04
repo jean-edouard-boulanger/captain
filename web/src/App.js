@@ -17,11 +17,23 @@ import socketIOClient from 'socket.io-client'
 
 import StartDownload from './StartDownload';
 import DownloadsTable from "./DownloadsTable";
+import NotConnected from "./NotConnected";
 
 import './App.css';
 
 
 const SIO_ENDPOINT = "http://127.0.0.1:3001"
+
+
+const ConnectState = {
+  CONNECT: "connected",
+  CONNECTING: "connecting",
+  DISCONNECT: "disconnected",
+  CONNECT_FAILED: "connection failed",
+  RECONNECT: "connected",
+  RECONNECTING: "connecting",
+  RECONNECT_FAILED: "connection failed"
+}
 
 
 function Alert(props) {
@@ -59,6 +71,7 @@ function makeController(socket) {
       socket.emit("start_download", {
         remote_file_url: data.remoteFileUrl,
         local_dir: data.localDir,
+        local_file_name: data.renameTo,
         auth: makeAuth()
       });
     }
@@ -68,6 +81,7 @@ function makeController(socket) {
 function App() {
   const [socket, setSocket] = useState(null);
   const [controller, setController] = useState(null);
+  const [connectState, setConnectState] = useState(ConnectState.DISCONNECT);
   const [settings, setSettings] = useState(null);
   const [downloads, setDownloads] = useState([]);
   const [displayNewTaskForm, setDisplayNewTaskForm] = useState(false);
@@ -84,6 +98,14 @@ function App() {
 
   useEffect(() => {
     if(socket === null) { return; }
+    socket.on("connect", () => { setConnectState(ConnectState.CONNECT); });
+    socket.on("connecting", () => { setConnectState(ConnectState.CONNECTING); });
+    socket.on("disconnect", () => { setConnectState(ConnectState.DISCONNECT); });
+    socket.on("connect_failed", () => { setConnectState(ConnectState.CONNECT_FAILED); });
+    socket.on("reconnect", () => { setConnectState(ConnectState.CONNECT); });
+    socket.on("reconnecting", () => { setConnectState(ConnectState.RECONNECTING); });
+    socket.on("reconnect_failed", () => { setConnectState(ConnectState.RECONNECT_FAILED); });
+
     socket.on("recap", data => {
       setSettings(data.settings);
       setDownloads(data.downloads.map(entry => {
@@ -127,6 +149,10 @@ function App() {
     });
   }, [socket]);
 
+  const isConnected = () => {
+    return connectState === ConnectState.CONNECT;
+  };
+
   return (
     <React.Fragment>
       <AppBar title='Captain' color='primary'>
@@ -139,30 +165,39 @@ function App() {
       <Toolbar />
       <Toolbar />
       <Container maxWidth='lg'>
-        <Collapse in={!displayNewTaskForm}>
+      {
+        (!isConnected()) &&
+        <NotConnected connection={connectState} />
+      }
+      {
+        (isConnected()) &&
+        <React.Fragment>
+          <Collapse in={!displayNewTaskForm}>
+            <Grid item xs={12}>
+              <Button variant="contained"
+                      startIcon={<AddCircleIcon />}
+                      onClick={() => setDisplayNewTaskForm(true)} >
+                New Task
+              </Button>
+            </Grid>
+          </Collapse>
+          <Collapse in={displayNewTaskForm}>
+            <Grid item xs={12}>
+              <StartDownload onStart={(data) => {
+                               setDisplayNewTaskForm(false);
+                               controller.startDownload(data);
+                             }}
+                             onCancel={() => setDisplayNewTaskForm(false)}
+                             settings={settings} />
+            </Grid>
+          </Collapse>
           <Grid item xs={12}>
-            <Button variant="contained"
-                    startIcon={<AddCircleIcon />}
-                    onClick={() => setDisplayNewTaskForm(true)} >
-              New Task
-            </Button>
+            <DownloadsTable downloads={downloads}
+                            controller={controller}
+                            settings={settings} />
           </Grid>
-        </Collapse>
-        <Collapse in={displayNewTaskForm}>
-          <Grid item xs={12}>
-            <StartDownload onStart={(data) => {
-                             setDisplayNewTaskForm(false);
-                             controller.startDownload(data);
-                           }}
-                           onCancel={() => setDisplayNewTaskForm(false)}
-                           settings={settings} />
-          </Grid>
-        </Collapse>
-        <Grid item xs={12}>
-          <DownloadsTable downloads={downloads}
-                          controller={controller}
-                          settings={settings} />
-        </Grid>
+        </React.Fragment>
+      }
       </Container>
       <Snackbar anchorOrigin={{vertical: 'bottom', horizontal: 'left'}}
                 open={notification !== null}

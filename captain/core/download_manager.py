@@ -500,9 +500,10 @@ class DownloadManager(DownloadListenerBase):
             observer.handle_event(DownloadManagerEvent(*args, **kwargs))
 
     def stop(self):
-        logger.info("stopping download manager")
+        logger.info("download manager requested to stop")
         self._stop_flag.set()
 
     def run(self):
+        logger.info("download manager requested to run")
         self._request_loop()
         self._db.flush()

@@ -8,7 +8,7 @@ from .download_entities import (
     ErrorInfo
 )
 
-from typing import Optional, List
+from typing import Optional, List, Protocol
 from dataclasses import dataclass
 from urllib.parse import urlparse, unquote
 from threading import Event, Thread
@@ -68,6 +68,14 @@ class ProgressManager(object):
     @property
     def total_bytes(self):
         return sum(p.total_bytes for p in self.progress)
+
+
+class DownloadTaskBase(Protocol):
+    def run(self) -> None:
+        raise NotImplementedError("must implement 'run'")
+
+    def stop(self):
+        raise NotImplementedError("must implement 'stop'")
 
 
 class DownloadTask(object):
@@ -133,15 +141,17 @@ class DownloadTask(object):
             remote_file_name=remote_file_name,
             remote_url=settings.remote_file_url)
         request_settings = {"verify": False, "stream": True, "headers": {}}
-        if settings.auth is not None:
+        if settings.auth:
             request_settings["auth"] = settings.auth
-        if settings.data_range is not None:
+        if settings.data_range:
             request_settings["headers"]["Range"] = _make_range_header(settings.data_range)
         with requests.get(settings.remote_file_url, **request_settings) as r:
             r.raise_for_status()
-            raw_file_size = r.headers.get("Content-Length")
+            headers = r.headers
+            raw_file_size = headers.get("Content-Length")
             download_metadata.file_size = int(raw_file_size) if raw_file_size else None
-            download_metadata.file_type = r.headers.get("Content-Type")
+            download_metadata.file_type = headers.get("Content-Type")
+            download_metadata.accept_ranges = headers.get("Accept-Ranges") == "bytes"
             self._listener.download_started(datetime.now(), self._handle, download_metadata)
             self._download_loop(r)
 
@@ -156,12 +166,12 @@ class DownloadTask(object):
                           traceback.format_exc()))
 
     def stop(self):
+        logger.info(f"task {self._handle} requested to stop")
         self._stopped_flag.set()
-        pass
 
 
 class ThreadedDownloadTask(Thread):
-    def __init__(self, task: DownloadTask):
+    def __init__(self, task: DownloadTaskBase):
         super().__init__()
         self._task = task
 
