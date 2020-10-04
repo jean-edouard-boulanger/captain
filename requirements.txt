@@ -1,0 +1,6 @@
+flask
+requests
+socketio
+eventlet
+zmq
+aiohttp
