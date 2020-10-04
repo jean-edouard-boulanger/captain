@@ -5,5 +5,11 @@ from .download_manager import (
     DownloadManagerEvent,
     EventType
 )
-from .download_request import DownloadRequest
-from .download_handle import DownloadHandle
+from .download_entities import (
+    ErrorInfo,
+    DownloadStatus,
+    DownloadMetadata,
+    DownloadState,
+    DownloadRequest,
+    DownloadHandle
+)

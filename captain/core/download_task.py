@@ -1,9 +1,12 @@
-from .download_request import DownloadRequest, DataRange
-from .download_handle import DownloadHandle
 from .download_listener import DownloadListenerBase, NoOpDownloadListener
-from .download_metadata import DownloadMetadata
 from .download_sink import DownloadSinkBase, NoOpDownloadSink
-from .error_info import ErrorInfo
+from .download_entities import (
+    DownloadRequest,
+    DownloadMetadata,
+    DownloadHandle,
+    DataRange,
+    ErrorInfo
+)
 
 from typing import Optional, List
 from dataclasses import dataclass
