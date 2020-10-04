@@ -359,9 +359,13 @@ class DownloadManager(DownloadListenerBase):
         entry = self._entries[handle]
         if not entry.state.can_be_stopped:
             raise DownloadManagerError("cannot stop task")
+        entry.state.last_update_time = datetime.now()
+        if entry.task is None:
+            invariant(entry.state.status == _DownloadStatus.PAUSED)
+            entry.state.requested_status = _DownloadStatus.STOPPED
+            return self._handle_download_stopped(datetime.now(), handle)
         entry.task.stop()
         entry.state.requested_status = _DownloadStatus.STOPPED
-        entry.state.last_update_time = datetime.now()
 
     def _handle_pause_download(self, handle: DownloadHandle):
         if handle not in self._entries:
@@ -462,14 +466,17 @@ class DownloadManager(DownloadListenerBase):
                                  handle: DownloadHandle) -> None:
         invariant(handle in self._entries)
         entry = self._entries[handle]
-        entry.task.join()
-        entry.task = None
+        invariant(entry.task is not None or entry.state.status == _DownloadStatus.PAUSED)
+        if entry.task is not None:
+            entry.task.join()
+            entry.task = None
         requested_status = entry.state.requested_status
         invariant(requested_status is not None)
         invariant(requested_status in {_DownloadStatus.STOPPED, _DownloadStatus.PAUSED})
         entry.state.last_update_time = update_time
         entry.state.status = requested_status
         entry.state.requested_status = None
+        entry.state.end_time = update_time
         if requested_status == _DownloadStatus.STOPPED:
             files = [entry.system_request.local_dir / entry.system_request.local_file_name]
             self._queue_request(_cleanup_files, args=(files, ))
