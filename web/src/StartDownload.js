@@ -1,23 +1,26 @@
 import React, {useEffect, useState} from 'react';
 import {
   Button,
+  Box,
   Card,
   CardActions,
   CardContent,
   TextField,
   Typography,
   FormControl,
-  FormHelperText,
+  InputLabel,
   Select,
   MenuItem,
   Collapse,
   Grid
 } from "@material-ui/core";
+import { makeStyles } from '@material-ui/core/styles';
 
 
 function isBlank(val) {
   return val === "" || val === null || val === undefined;
 }
+
 
 function defaultCredentials() {
   return {username: null, password: null};
@@ -87,46 +90,55 @@ export default function StartDownload({onStart, onCancel, settings}) {
         </Typography>
         <Grid container direction="column" spacing={2}>
           <Grid item>
+            <Box m={1}>
             <TextField value={remoteFileUrl || ""}
                        label="Remote file URL"
                        error={formErrors.remoteFileUrl !== undefined}
                        onChange={(e) => {setRemoteFileUrl(e.target.value)}}
                        fullWidth />
+            </Box>
           </Grid>
           <Grid item>
-            <TextField label="Save to"
-                       value={localDir || ""}
-                       onChange={(e) => {setLocalDir(e.target.value)}}
-                       fullWidth />
+            <Box m={1}>
+              <TextField label="Save to directory"
+                         value={localDir || ""}
+                         onChange={(e) => {setLocalDir(e.target.value)}}
+                         fullWidth />
+            </Box>
           </Grid>
           <Grid item>
-            <FormControl>
-              <FormHelperText>Authentication mode</FormHelperText>
-              <Select value={authMode || "none"}
-                      onChange={(e) => setAuthMode(e.target.value)}>
-                <MenuItem value="none">None</MenuItem>
-                <MenuItem value="basic">Basic</MenuItem>
-              </Select>
-            </FormControl>
-          </Grid>
-          <Grid item>
-            <Collapse in={authMode === "basic"}>
-                <TextField label="Username"
-                           error={formErrors.username !== undefined}
-                           onChange={(e) => {
-                             credentials.username = e.target.value;
-                             setCredentials({...credentials});
-                           }}
-                           value={credentials.username} />
-                <TextField label="Password"
-                           type="password"
-                           error={formErrors.password !== undefined}
-                           onChange={(e) => {
-                             credentials.password = e.target.value;
-                             setCredentials({...credentials});
-                           }}
-                           value={credentials.password}/>
-            </Collapse>
+              <Box display="flex">
+                <Box m={1}>
+                  <FormControl style={{minWidth: 200}}>
+                    <InputLabel id="auth-mode-select-label">Authentication mode</InputLabel>
+                    <Select labelId="auth-mode-select-label"
+                            value={authMode || "none"}
+                            onChange={(e) => setAuthMode(e.target.value)}>
+                      <MenuItem value="none">None</MenuItem>
+                      <MenuItem value="basic">Basic</MenuItem>
+                    </Select>
+                  </FormControl>
+                </Box>
+                <Box m={1} hidden={authMode !== "basic"}>
+                  <TextField label="Username"
+                             error={formErrors.username !== undefined}
+                             onChange={(e) => {
+                               credentials.username = e.target.value;
+                               setCredentials({...credentials});
+                             }}
+                             value={credentials.username} />
+                </Box>
+                <Box m={1} hidden={authMode !== "basic"}>
+                  <TextField label="Password"
+                             type="password"
+                             error={formErrors.password !== undefined}
+                             onChange={(e) => {
+                               credentials.password = e.target.value;
+                               setCredentials({...credentials});
+                             }}
+                             value={credentials.password}/>
+                </Box>
+            </Box>
           </Grid>
         </Grid>
       </CardContent>
