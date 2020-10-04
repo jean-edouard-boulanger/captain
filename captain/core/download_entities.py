@@ -91,9 +91,9 @@ class DownloadRequest:
         if data is None:
             return None
         return DownloadRequest(
-            remote_file_url=data["remoteFileUrl"],
-            local_dir=data.get("localDir"),
-            local_file_name=data.get("localFileName"),
+            remote_file_url=data["remote_file_url"],
+            local_dir=Path(data.get("local_dir")) if data.get("local_dir") else None,
+            local_file_name=data.get("local_file_name"),
             auth=_deserialize_auth(data.get("auth")),
             data_range=DataRange.deserialize(data)
         )
@@ -226,8 +226,8 @@ class DownloadState:
             downloaded_bytes=data["downloaded_bytes"],
             current_rate=data["current_rate"],
             status=DownloadStatus[data["status"]],
-            start_time=datetime.isoformat(data["start_time"]) if data["start_time"] else None,
-            end_time=datetime.isoformat(data["end_time"]) if data["end_time"] else None,
+            start_time=datetime.fromisoformat(data["start_time"]) if data["start_time"] else None,
+            end_time=datetime.fromisoformat(data["end_time"]) if data["end_time"] else None,
             error_info=ErrorInfo.deserialize(data["error_info"])
         )
 

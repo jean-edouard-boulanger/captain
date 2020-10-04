@@ -134,7 +134,7 @@ export default function StartDownload({onStart, onCancel, settings}) {
         <Button size="small" onClick={() => submitForm()}>
           Start
         </Button>
-        <Button size="small" onClick={() => onCancel()}>
+        <Button size="small" onClick={() => {resetForm(); onCancel()}}>
           Cancel
         </Button>
       </CardActions>
