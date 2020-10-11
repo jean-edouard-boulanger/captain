@@ -3,7 +3,7 @@ from .download_entities import (
     DownloadEntry
 )
 
-from typing import Protocol, Dict, List, Optional
+from typing import Protocol, Dict, List, Optional, ContextManager
 from contextlib import contextmanager
 from pathlib import Path
 import enum
@@ -35,7 +35,7 @@ class PersistenceBase(Protocol):
         raise NotImplementedError("must implement 'flush'")
 
     @contextmanager
-    def scoped_entry(self, handle: DownloadHandle):
+    def scoped_entry(self, handle: DownloadHandle) -> ContextManager[DownloadEntry]:
         entry = self.get_entry(handle)
         yield entry
         self.persist_entry(entry)

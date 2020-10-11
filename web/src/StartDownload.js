@@ -15,6 +15,7 @@ import {
   MenuItem,
   Grid
 } from "@material-ui/core";
+import ScheduleDialog from "./ScheduleDialog";
 
 
 function isBlank(val) {
@@ -34,6 +35,7 @@ export default function StartDownload({onStart, onCancel, settings}) {
   const [authMode, setAuthMode] = useState(null);
   const [credentials, setCredentials] = useState(defaultCredentials())
   const [formErrors, setFormErrors] = useState({})
+  const [displayScheduleDialog, setDisplayScheduleDialog] = useState(false);
 
   useEffect(() => {
     if(saveTo === null) { return; }
@@ -44,49 +46,75 @@ export default function StartDownload({onStart, onCancel, settings}) {
     setLocalDir(saveTo);
   }, [saveTo]);
 
-  const validateForm = () => {
+  const validateForm = (data) => {
     const errors = {}
-    if(isBlank(remoteFileUrl)) {
+    if(isBlank(data.remoteFileUrl)) {
       errors.remoteFileUrl = true;
     }
-    if(saveTo === "system-custom" && isBlank(localDir)) {
+    if(data.saveTo === "system-custom" && isBlank(data.localDir)) {
       errors.localDir = true;
     }
-    if(authMode === "simple") {
-      if(isBlank(credentials.username)) {
+    if(data.authMode === "simple") {
+      if(isBlank(data.credentials.username)) {
         errors.username = true
       }
-      if(isBlank(credentials.password)) {
+      if(isBlank(data.credentials.password)) {
         errors.password = true
       }
     }
-    setFormErrors(errors);
-    return Object.keys(errors).length === 0;
+    return {
+      errors,
+      valid: Object.keys(errors).length === 0
+    }
   }
 
   const getFormData = () => {
-    return {
+    const download = {
       remoteFileUrl,
+      saveTo,
       localDir,
       renameTo,
       authMode,
       credentials
     };
+    const validation = validateForm(download);
+    return {
+      download,
+      ...validation
+    };
   }
 
   const resetForm = () => {
     setRemoteFileUrl(null);
+    setSaveTo("system-auto");
     setLocalDir(null);
     setAuthMode(null);
     setCredentials(defaultCredentials());
     setFormErrors({});
   }
 
-  const submitForm = () => {
-    if(validateForm()) {
-      const formData = getFormData();
+  const submitForm = ({schedule}) => {
+    const formData = getFormData()
+    if(!formData.valid) {
+      setFormErrors(formData.errors);
+    }
+    else {
       resetForm();
-      onStart(formData);
+      onStart({
+        download: formData.download,
+        schedule: schedule || null
+      });
+    }
+  }
+
+  const initSchedule = () => {
+    const formData = getFormData()
+    if(!formData.valid) {
+      setFormErrors(formData.errors);
+    }
+    else
+    {
+      setDisplayScheduleDialog(true);
     }
   }
 
@@ -190,13 +218,19 @@ export default function StartDownload({onStart, onCancel, settings}) {
         </Grid>
       </CardContent>
       <CardActions>
-        <Button size="small" onClick={() => submitForm()}>
+        <Button size="small" onClick={() => submitForm({schedule: null})}>
           Start
+        </Button>
+        <Button size="small" onClick={() => initSchedule()}>
+          Schedule
         </Button>
         <Button size="small" onClick={() => {resetForm(); onCancel()}}>
           Cancel
         </Button>
       </CardActions>
+      <ScheduleDialog open={displayScheduleDialog}
+                      onClose={() => setDisplayScheduleDialog(false)}
+                      onSchedule={(schedule) => submitForm({schedule})} />
     </Card>
   );
 }

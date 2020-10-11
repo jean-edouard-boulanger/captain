@@ -1,9 +1,12 @@
 #!/usr/bin/env python3.8
 from typing import Callable
+from datetime import datetime, timedelta
 import socketio
 import asyncio
 import logging
 import sys
+import pytz
+
 
 logging.basicConfig(stream=sys.stdout, level=logging.INFO)
 logger = logging.getLogger("main")
@@ -37,6 +40,7 @@ async def main_loop(emit: Callable):
         await emit("start_download", {
             "remote_file_url": DOWNLOAD_URL,
             "local_dir": "/Users/jboulanger/Downloads",
+            "start_at": (datetime.now(pytz.utc) + timedelta(seconds=5)).isoformat(),
             "auth": {
                 "basic": {
                     "username": "jboulanger",
@@ -44,7 +48,7 @@ async def main_loop(emit: Callable):
                 }
             }
         })
-        await asyncio.sleep(1)
+        await asyncio.sleep(3600)
 
 
 async def main():

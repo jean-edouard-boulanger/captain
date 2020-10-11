@@ -55,23 +55,37 @@ function makeController(socket) {
     retryDownload: (handle) => {
       socket.emit("retry_download", {"handle": handle})
     },
+    rescheduleDownload: (handle, startAt) => {
+      socket.emit("reschedule_download", {
+        "handle": handle,
+        "start_at": startAt.toISOString()
+      })
+    },
     removeDownload: (handle) => {
       socket.emit("remove_download", {"handle": handle})
     },
     startDownload: (data) => {
+      const download = data.download;
       const makeAuth = () => {
-        if(data.authMode === "none" || data.authMode === null)
+        if(download.authMode === "none" || download.authMode === null)
         {
           return null;
         }
         let auth = {};
-        auth[data.authMode] = data.credentials;
+        auth[download.authMode] = download.credentials;
         return auth;
-      }
+      };
+      const makeStartAt = () => {
+        if(data.schedule === null) {
+          return null;
+        }
+        return data.schedule.toISOString()
+      };
       socket.emit("start_download", {
-        remote_file_url: data.remoteFileUrl,
-        local_dir: data.localDir,
-        local_file_name: data.renameTo,
+        remote_file_url: download.remoteFileUrl,
+        local_dir: download.localDir,
+        local_file_name: download.renameTo,
+        start_at: makeStartAt(),
         auth: makeAuth()
       });
     }
