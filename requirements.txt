@@ -1,5 +1,5 @@
+python-socketio
 requests
-socketio
 aiohttp
 pyyaml
 dateutil
