@@ -3,7 +3,6 @@ import {
   Dialog,
   DialogTitle,
   DialogContent,
-  DialogContentText,
   DialogActions,
   Box,
   Button
@@ -16,8 +15,8 @@ import {
 } from '@material-ui/pickers';
 
 
-export default function ScheduleDialog({open, onSchedule, onClose}) {
-  const [selectedDate, setSelectedDate] = useState(new Date());
+export default function ScheduleDialog({open, onClose, initialSchedule}) {
+  const [selectedDate, setSelectedDate] = useState(initialSchedule || new Date());
 
   const handleDateChange = (date) => {
     setSelectedDate(date)
@@ -50,7 +49,7 @@ export default function ScheduleDialog({open, onSchedule, onClose}) {
           </Box>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => {onSchedule(selectedDate); onClose()}}>
+          <Button onClick={() => onClose(selectedDate)}>
             Schedule
           </Button>
           <Button onClick={() => onClose()}>

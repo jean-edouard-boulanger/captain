@@ -1,6 +1,10 @@
 import {
-  Chip, IconButton,
-  LinearProgress, ListItemIcon, Menu, MenuItem,
+  Chip,
+  IconButton,
+  LinearProgress,
+  ListItemIcon,
+  Menu,
+  MenuItem,
   Table,
   TableBody,
   TableCell,
@@ -16,6 +20,8 @@ import StopIcon from "@material-ui/icons/Stop";
 import ReplayIcon from "@material-ui/icons/Replay";
 import ClearIcon from "@material-ui/icons/Clear";
 import React, {useState} from "react";
+import ScheduleDialog from "./ScheduleDialog";
+import {format as format_date} from 'date-fns';
 
 
 function convertBytes(bps)
@@ -39,6 +45,7 @@ function defaultMetadata()
 
 export default function DownloadsTable(props) {
   const [actionMenu, setActionMenu] = useState(null);
+  const [scheduleDialog, setScheduleDialog] = useState(null);
 
   const {
     downloads,
@@ -81,7 +88,7 @@ export default function DownloadsTable(props) {
                 <TableCell>{payload.user_request.properties.remote_file_name}</TableCell>
                 <TableCell>
                   {(state.status === "SCHEDULED" && payload.user_request.start_at !== null) &&
-                    `Scheduled to start at ${payload.user_request.start_at}`
+                    `Will start on ${format_date(new Date(payload.user_request.start_at), 'mm/dd/yyyy hh:mm a')}`
                   }
                   {(progress !== null) &&
                     <LinearProgress variant="determinate"
@@ -146,7 +153,10 @@ export default function DownloadsTable(props) {
                     }
                     {
                       (state.properties.can_be_rescheduled) &&
-                      <MenuItem onClick={() => {closeActionMenu(); controller.rescheduleDownload(handle, new Date())}}>
+                      <MenuItem onClick={() => {
+                        closeActionMenu();
+                        controller.rescheduleDownload(handle, new Date())
+                      }}>
                         <ListItemIcon>
                           <PlayArrowIcon fontSize="small" />
                         </ListItemIcon>
@@ -155,7 +165,15 @@ export default function DownloadsTable(props) {
                     }
                     {
                       (state.properties.can_be_rescheduled) &&
-                      <MenuItem onClick={() => {closeActionMenu(); controller.rescheduleDownload(handle)}}>
+                      <MenuItem onClick={() => {
+                        closeActionMenu();
+                        setScheduleDialog({
+                          initialSchedule: Date.parse(payload.user_request.start_at),
+                          onReschedule: ({schedule}) => {
+                            controller.rescheduleDownload(handle, schedule);
+                          }
+                        })
+                      }}>
                         <ListItemIcon>
                           <AccessAlarmIcon fontSize="small" />
                         </ListItemIcon>
@@ -179,6 +197,14 @@ export default function DownloadsTable(props) {
         }
         </TableBody>
       </Table>
+      <ScheduleDialog open={scheduleDialog !== null}
+                      initialSchedule={(scheduleDialog ?? {}).initialSchedule}
+                      onClose={(schedule) => {
+                        setScheduleDialog(null);
+                        if(schedule !== null && schedule !== undefined) {
+                          scheduleDialog.onReschedule({schedule});
+                        }
+                      }} />
     </TableContainer>
   )
 }

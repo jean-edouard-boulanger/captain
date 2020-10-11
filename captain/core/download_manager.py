@@ -161,7 +161,8 @@ class DownloadManager(DownloadListenerBase):
         self._scheduler = ThreadedScheduler(Scheduler())
         for entry in self._db.get_all_entries():
             if entry.user_request.start_at is not None and entry.state.status == DownloadStatus.SCHEDULED:
-                self._scheduler.schedule_unsafe(
+                invariant(entry.state.schedule_handle is None)
+                entry.state.schedule_handle = self._scheduler.schedule_unsafe(
                     at=entry.user_request.start_at,
                     action=partial(
                         self._queue_request,
@@ -313,6 +314,7 @@ class DownloadManager(DownloadListenerBase):
                 raise DownloadManagerError(f"cannot reschedule download")
             invariant(entry.state.schedule_handle is not None)
             self._scheduler.cancel(entry.state.schedule_handle)
+            entry.user_request.start_at = start_at
             entry.state.schedule_handle = self._defer_request(
                 start_at,
                 self._handle_start_download,
@@ -469,7 +471,8 @@ class DownloadManager(DownloadListenerBase):
         self._tasks[handle].join()
         del self._tasks[handle]
         with self._db.scoped_entry(handle) as entry:
-            invariant(entry.state.downloaded_bytes == entry.state.metadata.file_size)
+            file_size = entry.state.metadata.file_size
+            invariant(file_size is None or entry.state.downloaded_bytes == file_size)
             local_dir = Path(entry.user_request.local_dir or os.getcwd())
             local_file_name = entry.user_request.local_file_name or entry.state.metadata.remote_file_name
             temp_file_path = entry.system_request.local_dir / entry.system_request.local_file_name
@@ -562,7 +565,7 @@ class DownloadManager(DownloadListenerBase):
     def _check_enabled(self):
         if self._stop_flag.is_set():
             raise DownloadManagerError("download manager is stopping,"
-                                       " public interface is disabled")
+                                       " interface is disabled")
 
     def _request_loop(self):
         shutdown_at: Optional[datetime] = None
@@ -572,7 +575,7 @@ class DownloadManager(DownloadListenerBase):
                 self._stop_outstanding_tasks()
                 shutdown_at = datetime.now() + self._settings.shutdown_timeout
                 logger.info(f"will force shutdown at {shutdown_at}")
-            elif self._stop_flag.is_set() and shutdown_at is not None:
+            elif shutdown_at is not None:
                 all_inactive = all(not entry.state.is_active
                                    for entry in self._db.get_all_entries())
                 if all_inactive:
@@ -608,6 +611,8 @@ class DownloadManager(DownloadListenerBase):
         logger.info("download manager requested to run")
         self._scheduler.start()
         self._request_loop()
+        logger.info("stopping internal scheduler")
         self._scheduler.stop()
         self._scheduler.join()
+        logger.info("persisting download manager state")
         self._db.flush()
