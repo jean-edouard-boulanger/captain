@@ -148,7 +148,7 @@ class DownloadTask(object):
         with requests.get(settings.remote_file_url, **request_settings) as r:
             r.raise_for_status()
             headers = r.headers
-            logger.info(dict(r.cookies))
+            logger.debug(f"received headers: {headers}")
             raw_file_size = headers.get("Content-Length")
             download_metadata.file_size = int(raw_file_size) if raw_file_size else None
             download_metadata.file_type = headers.get("Content-Type")

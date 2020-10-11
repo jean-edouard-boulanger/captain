@@ -67,13 +67,13 @@ class Scheduler(object):
         logger.info("scheduler started")
         while True:
             timeout = self._time_to_next_action()
-            timeout = 1 if timeout is None else min(10.0, timeout)
             event = _pop_queue(self._events, timeout)
             if event is not None:
                 logger.debug(f"handling event: {event}")
                 self._handle_event(event)
             if not self._running:
-                logger.debug("scheduler no longer running, leaving main loop")
+                logger.info("scheduler no longer running")
+                logger.info(f"leaving main loop with {len(self._pending_actions)} pending actions")
                 return
             now = _now_utc()
             cleanup_handles = []
@@ -87,7 +87,8 @@ class Scheduler(object):
                 del self._pending_actions[handle]
 
     def schedule(self, at: datetime, action: Action):
-        logger.debug(f"requested to schedule action {action} at {at} (in {(at - _now_utc()).total_seconds()}s)")
+        logger.debug(f"requested to schedule action {action} at {at} "
+                     f"(in {(at - _now_utc()).total_seconds()}s)")
         return self._queue_event(_Schedule(_Entry(at, action))).get()
 
     def schedule_unsafe(self, at: datetime, action: Action):

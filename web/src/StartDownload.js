@@ -118,8 +118,6 @@ export default function StartDownload({onStart, onCancel, settings}) {
     }
   }
 
-  console.log(settings);
-
   return (
     <Card>
       <CardContent>
@@ -229,8 +227,10 @@ export default function StartDownload({onStart, onCancel, settings}) {
         </Button>
       </CardActions>
       <ScheduleDialog open={displayScheduleDialog}
-                      onClose={() => setDisplayScheduleDialog(false)}
-                      onSchedule={(schedule) => submitForm({schedule})} />
+                      onClose={(schedule) => {
+                        submitForm({schedule})
+                        setDisplayScheduleDialog(false);
+                      }} />
     </Card>
   );
 }
