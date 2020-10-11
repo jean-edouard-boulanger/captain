@@ -17,7 +17,7 @@ setuptools.setup(
     ],
     install_requires=[
         'requests',
-        'socketio',
+        'python-socketio',
         'aiohttp',
         'pyyaml'
     ]
