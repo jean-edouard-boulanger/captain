@@ -6,11 +6,12 @@ from captain.core import (
     DownloadManagerEvent,
     DownloadHandle
 )
+
+from dateutil.parser import parse as parse_date
 from typing import Callable
 from asyncio import Queue
 from aiohttp import web
 import yaml
-import traceback
 import argparse
 import threading
 import asyncio
@@ -21,7 +22,7 @@ import os
 
 sio = socketio.AsyncServer(async_mode='aiohttp', cors_allowed_origins='*')
 
-logging.basicConfig(stream=sys.stdout, level=logging.INFO)
+logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
 logger = logging.getLogger("ws")
 
 os.environ["PYTHONWARNINGS"] = "ignore:Unverified HTTPS request"
@@ -87,6 +88,14 @@ async def on_start_download(_, data):
     logger.info(f"start download: {data}")
     download_request = DownloadRequest.deserialize(data)
     get_manager().start_download(download_request)
+
+
+@sio.on("reschedule_download")
+async def on_start_download(_, data):
+    logger.info(f"reschedule download: {data}")
+    get_manager().reschedule_download(
+        handle=DownloadHandle(data["handle"]),
+        start_at=parse_date(data["start_at"]))
 
 
 @sio.on("pause_download")

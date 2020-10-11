@@ -8,6 +8,7 @@ import {
   TableHead,
   TableRow, Typography
 } from "@material-ui/core";
+import AccessAlarmIcon from '@material-ui/icons/AccessAlarm';
 import MoreVertIcon from "@material-ui/icons/MoreVert";
 import PauseIcon from "@material-ui/icons/Pause";
 import PlayArrowIcon from "@material-ui/icons/PlayArrow";
@@ -68,6 +69,7 @@ export default function DownloadsTable(props) {
         {
           downloads.map(entry => {
             const payload = entry.payload;
+            console.log(payload);
             const handle = payload.handle;
             const state = payload.state;
             const metadata = state.metadata ?? defaultMetadata();
@@ -76,10 +78,15 @@ export default function DownloadsTable(props) {
               : state.downloaded_bytes / metadata.file_size;
             return (
               <TableRow key={payload.handle}>
-                <TableCell>{metadata.remote_file_name ?? 'Unknown'}</TableCell>
+                <TableCell>{payload.user_request.properties.remote_file_name}</TableCell>
                 <TableCell>
-                  <LinearProgress variant="determinate"
-                                  value={progress * 100} />
+                  {(state.status === "SCHEDULED" && payload.user_request.start_at !== null) &&
+                    `Scheduled to start at ${payload.user_request.start_at}`
+                  }
+                  {(progress !== null) &&
+                    <LinearProgress variant="determinate"
+                                    value={progress * 100} />
+                  }
                 </TableCell>
                 <TableCell style={{minWidth: 50, maxWidth: 50}}>
                   {(state.status === "ACTIVE") &&
@@ -135,6 +142,24 @@ export default function DownloadsTable(props) {
                           <ReplayIcon fontSize="small" />
                         </ListItemIcon>
                         <Typography variant="inherit">Retry</Typography>
+                      </MenuItem>
+                    }
+                    {
+                      (state.properties.can_be_rescheduled) &&
+                      <MenuItem onClick={() => {closeActionMenu(); controller.rescheduleDownload(handle, new Date())}}>
+                        <ListItemIcon>
+                          <PlayArrowIcon fontSize="small" />
+                        </ListItemIcon>
+                        <Typography variant="inherit">Start now</Typography>
+                      </MenuItem>
+                    }
+                    {
+                      (state.properties.can_be_rescheduled) &&
+                      <MenuItem onClick={() => {closeActionMenu(); controller.rescheduleDownload(handle)}}>
+                        <ListItemIcon>
+                          <AccessAlarmIcon fontSize="small" />
+                        </ListItemIcon>
+                        <Typography variant="inherit">Reschedule</Typography>
                       </MenuItem>
                     }
                     {

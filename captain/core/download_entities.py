@@ -1,10 +1,13 @@
 from requests.auth import HTTPBasicAuth, HTTPProxyAuth, HTTPDigestAuth
+from dateutil.parser import parse as parse_date
 from typing import Optional, Dict, Union
 from dataclasses import dataclass
+from urllib.parse import unquote
 from datetime import datetime
 from pathlib import Path
 import enum
 import uuid
+import os
 
 
 Auth = Union[HTTPBasicAuth, HTTPProxyAuth, HTTPDigestAuth]
@@ -74,16 +77,25 @@ class DownloadRequest:
     remote_file_url: str
     local_dir: Optional[Path] = None
     local_file_name: Optional[str] = None
+    start_at: Optional[datetime] = None
     auth: Optional[Auth] = None
     data_range: Optional[DataRange] = None
+
+    @property
+    def remote_file_name(self):
+        return unquote(os.path.basename(self.remote_file_url))
 
     def serialize(self) -> Dict:
         return {
             "remote_file_url": self.remote_file_url,
             "local_dir": str(self.local_dir) if self.local_dir else None,
             "local_file_name": str(self.local_file_name) if self.local_file_name else None,
+            "start_at": self.start_at.isoformat() if self.start_at else None,
             "has_auth": self.auth is not None,
-            "range": self.data_range.serialize() if self.data_range else None
+            "range": self.data_range.serialize() if self.data_range else None,
+            "properties": {
+                "remote_file_name": self.remote_file_name
+            }
         }
 
     @staticmethod
@@ -94,6 +106,7 @@ class DownloadRequest:
             remote_file_url=data["remote_file_url"],
             local_dir=Path(data.get("local_dir")) if data.get("local_dir") else None,
             local_file_name=data.get("local_file_name"),
+            start_at=parse_date(data.get("start_at")) if data.get("start_at") else None,
             auth=_deserialize_auth(data.get("auth")),
             data_range=DataRange.deserialize(data)
         )
@@ -120,6 +133,7 @@ class ErrorInfo:
 
 
 class DownloadStatus(enum.Enum):
+    SCHEDULED = enum.auto()
     PENDING = enum.auto()
     ACTIVE = enum.auto()
     PAUSED = enum.auto()
@@ -159,10 +173,11 @@ class DownloadMetadata:
 
 @dataclass
 class DownloadState:
+    status: DownloadStatus
     metadata: Optional[DownloadMetadata] = None
+    schedule_handle: Optional[int] = None
     downloaded_bytes: Optional[int] = None
     current_rate: Optional[float] = None
-    status: DownloadStatus = DownloadStatus.PENDING
     requested_status: Optional[DownloadStatus] = None
     last_update_time: Optional[datetime] = None
     start_time: Optional[datetime] = None
@@ -197,12 +212,16 @@ class DownloadState:
 
     @property
     def can_be_stopped(self):
-        return (self.status in {DownloadStatus.ACTIVE, DownloadStatus.PAUSED}
+        return (self.status in {DownloadStatus.ACTIVE, DownloadStatus.PAUSED, DownloadStatus.SCHEDULED}
                 and self.requested_status is None)
 
     @property
     def can_be_retried(self):
         return self.status in {DownloadStatus.STOPPED, DownloadStatus.ERROR}
+
+    @property
+    def can_be_rescheduled(self):
+        return self.status == DownloadStatus.SCHEDULED
 
     def serialize(self):
         return {
@@ -218,7 +237,8 @@ class DownloadState:
                 "can_be_resumed": self.can_be_resumed,
                 "can_be_paused": self.can_be_paused,
                 "can_be_stopped": self.can_be_stopped,
-                "can_be_retried": self.can_be_retried
+                "can_be_retried": self.can_be_retried,
+                "can_be_rescheduled": self.can_be_rescheduled
             }
         }
 
@@ -231,8 +251,8 @@ class DownloadState:
             downloaded_bytes=data["downloaded_bytes"],
             current_rate=data["current_rate"],
             status=DownloadStatus[data["status"]],
-            start_time=datetime.fromisoformat(data["start_time"]) if data["start_time"] else None,
-            end_time=datetime.fromisoformat(data["end_time"]) if data["end_time"] else None,
+            start_time=parse_date(data["start_time"]) if data["start_time"] else None,
+            end_time=parse_date(data["end_time"]) if data["end_time"] else None,
             error_info=ErrorInfo.deserialize(data["error_info"])
         )
 
@@ -241,14 +261,14 @@ class DownloadState:
 class DownloadEntry:
     handle: DownloadHandle
     user_request: DownloadRequest
-    system_request: DownloadRequest
+    system_request: Optional[DownloadRequest]
     state: DownloadState
 
     def serialize(self):
         return {
             "handle": str(self.handle),
             "user_request": self.user_request.serialize(),
-            "system_request": self.system_request.serialize(),
+            "system_request": self.system_request.serialize() if self.system_request else None,
             "state": self.state.serialize()
         }
 
