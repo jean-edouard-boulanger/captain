@@ -14,4 +14,6 @@ cp web/captain-web.service /etc/systemd/system/
 WEB_INSTALL_DIR=/usr/local/bin/captain/web
 mkdir -p ${WEB_INSTALL_DIR}
 cp -r web/* ${WEB_INSTALL_DIR}/
+cd ${WEB_INSTALL_DIR}/
+npm install
 npm run build
