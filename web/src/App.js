@@ -22,7 +22,7 @@ import NotConnected from "./NotConnected";
 import './App.css';
 
 
-const SIO_ENDPOINT = "http://127.0.0.1:3001"
+const SIO_ENDPOINT = "http://127.0.0.1:5001"
 
 
 const ConnectState = {
