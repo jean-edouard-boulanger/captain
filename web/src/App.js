@@ -108,7 +108,9 @@ function App() {
   const [notification, setNotification] = useState(null);
 
   useEffect(() => {
-    setSocket(socketIOClient(getServerEndpoint()));
+    const endpoint = getServerEndpoint();
+    console.log("captain server endpoint", endpoint);
+    setSocket(socketIOClient(endpoint));
   }, []);
 
   useEffect(() => {
