@@ -88,7 +88,7 @@ export default function DownloadsTable(props) {
                 <TableCell>{payload.user_request.properties.remote_file_name}</TableCell>
                 <TableCell>
                   {(state.status === "SCHEDULED" && payload.user_request.start_at !== null) &&
-                    `Will start on ${format_date(new Date(payload.user_request.start_at), 'mm/dd/yyyy hh:mm a')}`
+                    `Will start on ${format_date(new Date(payload.user_request.start_at), 'MM/dd/yyyy hh:mm a')}`
                   }
                   {(progress !== null) &&
                     <LinearProgress variant="determinate"
