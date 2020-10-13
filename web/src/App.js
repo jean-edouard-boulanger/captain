@@ -22,9 +22,6 @@ import NotConnected from "./NotConnected";
 import './App.css';
 
 
-const SIO_ENDPOINT = "http://127.0.0.1:5001"
-
-
 const ConnectState = {
   CONNECT: "connected",
   CONNECTING: "connecting",
@@ -38,6 +35,15 @@ const ConnectState = {
 
 function Alert(props) {
   return <MuiAlert elevation={6} variant="filled" {...props} />;
+}
+
+
+function getServerEndpoint() {
+  const endpoint = process.env.REACT_APP_CAPTAIN_SERVER_ENDPOINT;
+  if(endpoint !== undefined) {
+    return endpoint;
+  }
+  return "http://127.0.0.1:5001";
 }
 
 
@@ -102,7 +108,7 @@ function App() {
   const [notification, setNotification] = useState(null);
 
   useEffect(() => {
-    setSocket(socketIOClient(SIO_ENDPOINT));
+    setSocket(socketIOClient(getServerEndpoint()));
   }, []);
 
   useEffect(() => {
