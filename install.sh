@@ -7,7 +7,10 @@ id -u ${CAPTAIN_USER} >/dev/null 2>&1 || useradd -d /home/${CAPTAIN_USER} -g ${C
 
 python3.8 setup.py build install
 mkdir -p /etc/captain/
-cp captain/server/server-dev.yml /etc/captain/config.yml
+if [[ ! -f /etc/captain/config.yml ]]
+then
+  cp captain/server/server-dev.yml /etc/captain/config.yml
+fi
 cp captain/server/captain-server.service /etc/systemd/system/
 
 cp web/captain-web.service /etc/systemd/system/
