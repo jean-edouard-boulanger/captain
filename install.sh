@@ -17,3 +17,9 @@ cp -r web/* ${WEB_INSTALL_DIR}/
 cd ${WEB_INSTALL_DIR}/
 npm install
 npm run build
+
+systemctl daemon-reload
+systemctl enable captain-server
+systemctl restart captain-server
+systemctl enable captain-web
+systemctl restart captain-web
