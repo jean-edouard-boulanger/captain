@@ -52,7 +52,8 @@ async def main_loop(emit: Callable):
 
 
 async def main():
-    await sio.connect("http://127.0.0.1:5001")
+    #await sio.connect("http://127.0.0.1:5001")
+    await sio.connect("http://192.168.1.114:5001")
     sio.start_background_task(main_loop, sio.emit)
     await sio.wait()
 
