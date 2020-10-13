@@ -163,7 +163,7 @@ def main():
     sio.start_background_task(sio_publisher, shared_queue, sio.emit)
     logger.info("publisher started")
     web.run_app(app,
-                host='127.0.0.1', port=5001,
+                host='0.0.0.0', port=5001,
                 access_log=None,
                 handle_signals=True)
     logger.info("stopping download manager")
