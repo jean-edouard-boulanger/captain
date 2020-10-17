@@ -27,7 +27,7 @@ function defaultCredentials() {
   return {username: null, password: null};
 }
 
-export default function StartDownload({onStart, onCancel, settings}) {
+export default function StartDownload({onStart, onCancel, settings, controller}) {
   const [remoteFileUrl, setRemoteFileUrl] = useState(null);
   const [saveTo, setSaveTo] = useState("system-auto");
   const [localDir, setLocalDir] = useState(null);
@@ -38,7 +38,7 @@ export default function StartDownload({onStart, onCancel, settings}) {
   const [displayScheduleDialog, setDisplayScheduleDialog] = useState(false);
 
   useEffect(() => {
-    if(saveTo === null) { return; }
+    if(isBlank(saveTo)) { return; }
     if(saveTo === "system-auto" || saveTo === "system-custom") {
       setLocalDir(null);
       return;
@@ -46,13 +46,19 @@ export default function StartDownload({onStart, onCancel, settings}) {
     setLocalDir(saveTo);
   }, [saveTo]);
 
-  const validateForm = (data) => {
+  const validateForm = async (data) => {
     const errors = {}
     if(isBlank(data.remoteFileUrl)) {
       errors.remoteFileUrl = true;
     }
     if(data.saveTo === "system-custom" && isBlank(data.localDir)) {
       errors.localDir = true;
+    }
+    if(!isBlank(data.localDir)) {
+      const {valid, reason} = await controller.validateDirectory(data.localDir);
+      if(!valid) {
+        errors.localDir = reason;
+      }
     }
     if(data.authMode === "simple") {
       if(isBlank(data.credentials.username)) {
@@ -68,7 +74,7 @@ export default function StartDownload({onStart, onCancel, settings}) {
     }
   }
 
-  const getFormData = () => {
+  const getFormData = async () => {
     const download = {
       remoteFileUrl,
       saveTo,
@@ -77,12 +83,12 @@ export default function StartDownload({onStart, onCancel, settings}) {
       authMode,
       credentials
     };
-    const validation = validateForm(download);
+    const validation = await validateForm(download);
     return {
       download,
       ...validation
     };
-  }
+  };
 
   const resetForm = () => {
     setRemoteFileUrl(null);
@@ -91,10 +97,10 @@ export default function StartDownload({onStart, onCancel, settings}) {
     setAuthMode(null);
     setCredentials(defaultCredentials());
     setFormErrors({});
-  }
+  };
 
-  const submitForm = ({schedule}) => {
-    const formData = getFormData()
+  const submitForm = async ({schedule}) => {
+    const formData = await getFormData();
     if(!formData.valid) {
       setFormErrors(formData.errors);
     }
@@ -105,10 +111,10 @@ export default function StartDownload({onStart, onCancel, settings}) {
         schedule: schedule || null
       });
     }
-  }
+  };
 
-  const initSchedule = () => {
-    const formData = getFormData()
+  const initSchedule = async () => {
+    const formData = await getFormData();
     if(!formData.valid) {
       setFormErrors(formData.errors);
     }
@@ -116,7 +122,11 @@ export default function StartDownload({onStart, onCancel, settings}) {
     {
       setDisplayScheduleDialog(true);
     }
-  }
+  };
+
+  useEffect(() => {
+    setFormErrors({})
+  }, [remoteFileUrl, saveTo, localDir, renameTo, authMode, credentials]);
 
   return (
     <Card>
@@ -166,6 +176,7 @@ export default function StartDownload({onStart, onCancel, settings}) {
                            value={localDir || ""}
                            error={formErrors.localDir !== undefined}
                            onChange={(e) => {setLocalDir(e.target.value)}}
+                           helperText={formErrors.localDir || ""}
                            disabled={saveTo !== "system-custom"}
                            fullWidth />
               </Box>
@@ -199,7 +210,7 @@ export default function StartDownload({onStart, onCancel, settings}) {
                              credentials.username = e.target.value;
                              setCredentials({...credentials});
                            }}
-                           value={credentials.username} />
+                           value={credentials.username || ""} />
               </Box>
               <Box m={1} hidden={authMode !== "basic"}>
                 <TextField label="Password"
@@ -209,7 +220,7 @@ export default function StartDownload({onStart, onCancel, settings}) {
                              credentials.password = e.target.value;
                              setCredentials({...credentials});
                            }}
-                           value={credentials.password}/>
+                           value={credentials.password || ""}/>
               </Box>
             </Box>
           </Grid>

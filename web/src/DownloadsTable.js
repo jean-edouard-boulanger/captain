@@ -76,7 +76,6 @@ export default function DownloadsTable(props) {
         {
           downloads.map(entry => {
             const payload = entry.payload;
-            console.log(payload);
             const handle = payload.handle;
             const state = payload.state;
             const metadata = state.metadata ?? defaultMetadata();

@@ -4,10 +4,12 @@ from captain.core import (
     DownloadManagerObserverBase,
     DownloadRequest,
     DownloadManagerEvent,
-    DownloadHandle
+    DownloadHandle,
+    SocketioRpc
 )
 
 from dateutil.parser import parse as parse_date
+from pathlib import Path
 from typing import Callable
 from asyncio import Queue
 from aiohttp import web
@@ -21,6 +23,7 @@ import sys
 import os
 
 sio = socketio.AsyncServer(async_mode='aiohttp', cors_allowed_origins='*')
+rpc = SocketioRpc(sio)
 
 logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
 logger = logging.getLogger("ws")
@@ -139,6 +142,22 @@ async def on_start_download(_, data):
 async def connect(sid, _):
     logger.info(f"new client connected: {sid}")
     await sio.emit("recap", build_recap(get_manager()))
+
+
+@rpc.on("validate_download_directory")
+def handle_ping_request(_, request):
+    directory = Path(request["directory"]).expanduser()
+    if not directory.is_dir():
+        return {
+            "valid": False,
+            "reason": "This directory does not exist"
+        }
+    if not os.access(directory, os.W_OK):
+        return {
+            "valid": False,
+            "reason": "This directory is not writable"
+        }
+    return {"valid": True}
 
 
 def get_arguments_parser():
