@@ -20,7 +20,7 @@ from .future import Future
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import Dict, Any, Optional, Callable, Tuple, List, Protocol
-from functools import partial
+from functools import partial, wraps
 from pathlib import Path
 from queue import Queue
 import traceback
@@ -109,14 +109,20 @@ def _cleanup_files(files: List[Path]):
         os.remove(str(current_file))
 
 
+class Severity(enum.Enum):
+    INFO = enum.auto()
+    WARNING = enum.auto()
+    ERROR = enum.auto()
+
+
 @dataclass
-class _GeneralNotification:
-    severity: str
+class GeneralNotification:
+    severity: Severity
     message: str
 
     def serialize(self):
         return {
-            "severity": self.severity,
+            "severity": self.severity.name,
             "message": self.message
         }
 
@@ -150,6 +156,15 @@ class DownloadManagerObserverBase(Protocol):
         raise NotImplementedError("must implement 'handle_event'")
 
 
+def public_endpoint(func):
+    @wraps(func)
+    def impl(manager_self: 'DownloadManager', *args, **kwargs):
+        if not manager_self.public_api_enabled:
+            raise DownloadManagerError("download manager public api is disabled")
+        return func(manager_self, *args, **kwargs)
+    return impl
+
+
 class DownloadManager(DownloadListenerBase):
     def __init__(self, settings: DownloadManagerSettings):
         self._settings = settings
@@ -172,6 +187,85 @@ class DownloadManager(DownloadListenerBase):
     @property
     def settings(self) -> DownloadManagerSettings:
         return self._settings
+
+    @property
+    def public_api_enabled(self):
+        return not self._stop_flag.is_set()
+
+    @public_endpoint
+    def start_download(self,
+                       request: DownloadRequest,
+                       blocking: Optional[bool] = False):
+        return self._queue_request(
+            self._handle_schedule_download,
+            args=(request, ), blocking=blocking)
+
+    @public_endpoint
+    def reschedule_download(self,
+                            handle: DownloadHandle,
+                            start_at: datetime):
+        return self._queue_request(
+            self._handle_reschedule_download,
+            args=(handle, start_at))
+
+    @public_endpoint
+    def stop_download(self,
+                      handle: DownloadHandle,
+                      blocking: Optional[bool] = False):
+        return self._queue_request(
+            self._handle_stop_download,
+            args=(handle, ), blocking=blocking)
+
+    @public_endpoint
+    def pause_download(self,
+                       handle: DownloadHandle,
+                       blocking: Optional[bool] = False):
+        return self._queue_request(
+            self._handle_pause_download,
+            args=(handle, ), blocking=blocking)
+
+    @public_endpoint
+    def resume_download(self,
+                        handle: DownloadHandle,
+                        blocking: Optional[bool] = False):
+        return self._queue_request(
+            self._handle_resume_download,
+            args=(handle, ), blocking=blocking)
+
+    @public_endpoint
+    def remove_download(self,
+                        handle: DownloadHandle,
+                        blocking: Optional[bool] = False):
+        return self._queue_request(
+            self._handle_remove_download,
+            args=(handle, ), blocking=blocking)
+
+    @public_endpoint
+    def get_download(self,
+                     handle: DownloadHandle,
+                     blocking: Optional[bool] = False):
+        return self._queue_request(
+            self._handle_get_download,
+            args=(handle, ), blocking=blocking)
+
+    @public_endpoint
+    def get_downloads(self,
+                      blocking: Optional[bool] = False):
+        return self._queue_request(
+            self._handle_get_downloads,
+            blocking=blocking)
+
+    @public_endpoint
+    def retry_download(self,
+                       handle: DownloadHandle,
+                       blocking: Optional[bool] = False):
+        return self._queue_request(
+            self._handle_retry_download,
+            args=(handle, ), blocking=blocking)
+
+    @public_endpoint
+    def add_observer(self, observer: DownloadManagerObserverBase):
+        self._observers.append(observer)
 
     def download_started(self,
                          update_time: datetime,
@@ -212,81 +306,6 @@ class DownloadManager(DownloadListenerBase):
             self._handle_download_errored,
             args=(update_time, handle, error_info))
 
-    def start_download(self,
-                       request: DownloadRequest,
-                       blocking: Optional[bool] = False):
-        self._check_enabled()
-        return self._queue_request(
-            self._handle_schedule_download,
-            args=(request, ), blocking=blocking)
-
-    def reschedule_download(self,
-                            handle: DownloadHandle,
-                            start_at: datetime):
-        self._check_enabled()
-        return self._queue_request(
-            self._handle_reschedule_download,
-            args=(handle, start_at))
-
-    def stop_download(self,
-                      handle: DownloadHandle,
-                      blocking: Optional[bool] = False):
-        self._check_enabled()
-        return self._queue_request(
-            self._handle_stop_download,
-            args=(handle, ), blocking=blocking)
-
-    def pause_download(self,
-                       handle: DownloadHandle,
-                       blocking: Optional[bool] = False):
-        self._check_enabled()
-        return self._queue_request(
-            self._handle_pause_download,
-            args=(handle, ), blocking=blocking)
-
-    def resume_download(self,
-                        handle: DownloadHandle,
-                        blocking: Optional[bool] = False):
-        self._check_enabled()
-        return self._queue_request(
-            self._handle_resume_download,
-            args=(handle, ), blocking=blocking)
-
-    def remove_download(self,
-                        handle: DownloadHandle,
-                        blocking: Optional[bool] = False):
-        self._check_enabled()
-        return self._queue_request(
-            self._handle_remove_download,
-            args=(handle, ), blocking=blocking)
-
-    def get_download(self,
-                     handle: DownloadHandle,
-                     blocking: Optional[bool] = False):
-        self._check_enabled()
-        return self._queue_request(
-            self._handle_get_download,
-            args=(handle, ), blocking=blocking)
-
-    def get_downloads(self,
-                      blocking: Optional[bool] = False):
-        self._check_enabled()
-        return self._queue_request(
-            self._handle_get_downloads,
-            blocking=blocking)
-
-    def retry_download(self,
-                       handle: DownloadHandle,
-                       blocking: Optional[bool] = False):
-        self._check_enabled()
-        return self._queue_request(
-            self._handle_retry_download,
-            args=(handle, ), blocking=blocking)
-
-    def add_observer(self, observer: DownloadManagerObserverBase):
-        self._check_enabled()
-        self._observers.append(observer)
-
     def _handle_schedule_download(self, request: DownloadRequest) -> DownloadHandle:
         handle = DownloadHandle.make()
         invariant(not self._db.has_entry(handle))
@@ -303,7 +322,7 @@ class DownloadManager(DownloadListenerBase):
         logger.debug(f"got handle {schedule_handle} for scheduled event")
         entry.state.schedule_handle = schedule_handle
         self._db.persist_entry(entry)
-        self._notify_observers(EventType.DOWNLOAD_SCHEDULED, entry.serialize())
+        self._update_observers(EventType.DOWNLOAD_SCHEDULED, entry.serialize())
         return handle
 
     def _handle_reschedule_download(self, handle: DownloadHandle, start_at: datetime):
@@ -319,7 +338,7 @@ class DownloadManager(DownloadListenerBase):
                 start_at,
                 self._handle_start_download,
                 args=(handle,))
-        self._notify_observers(EventType.DOWNLOAD_SCHEDULED, entry.serialize())
+        self._update_observers(EventType.DOWNLOAD_SCHEDULED, entry.serialize())
 
     def _handle_start_download(self, handle: DownloadHandle) -> DownloadHandle:
         invariant(self._db.has_entry(handle))
@@ -414,7 +433,9 @@ class DownloadManager(DownloadListenerBase):
     def _handle_remove_download(self, handle: DownloadHandle):
         if not self._db.has_entry(handle):
             raise DownloadManagerError(f"download entry not found: {handle.handle}")
+        entry = self._db.get_entry(handle)
         self._db.remove_entry(handle)
+        self._notify_observers(Severity.INFO, f"Removed '{entry.user_request.remote_file_name}' from the list")
         logger.debug(f"removed task: {handle}")
 
     def _handle_get_download(self, handle: DownloadHandle) -> Dict:
@@ -444,7 +465,7 @@ class DownloadManager(DownloadListenerBase):
             entry.state.last_update_time = update_time
             entry.state.status = DownloadStatus.ACTIVE
             entry.state.requested_status = None
-            self._notify_observers(EventType.DOWNLOAD_STARTED, entry.serialize())
+            self._update_observers(EventType.DOWNLOAD_STARTED, entry.serialize())
             logger.debug(f"download {handle} started: {metadata.serialize()}")
 
     def _handle_download_errored(self,
@@ -460,7 +481,7 @@ class DownloadManager(DownloadListenerBase):
             entry.state.end_time = datetime.now()
             entry.state.last_update_time = update_time
             entry.state.error_info = error_info
-            self._notify_observers(EventType.DOWNLOAD_ERRORED, entry.serialize())
+            self._update_observers(EventType.DOWNLOAD_ERRORED, entry.serialize())
             logger.warning(f"download {handle} errored: {error_info.serialize()}")
 
     def _handle_download_complete(self,
@@ -482,7 +503,8 @@ class DownloadManager(DownloadListenerBase):
             entry.state.status = DownloadStatus.COMPLETE
             entry.state.end_time = datetime.now()
             entry.state.last_update_time = update_time
-            self._notify_observers(EventType.DOWNLOAD_COMPLETE, entry.serialize())
+            self._update_observers(EventType.DOWNLOAD_COMPLETE, entry.serialize())
+            self._notify_observers(Severity.INFO, f"Download '{entry.user_request.remote_file_name}' complete")
             logger.info(f"task {handle} complete")
 
     def _handle_download_stopped(self,
@@ -504,7 +526,7 @@ class DownloadManager(DownloadListenerBase):
             if requested_status == DownloadStatus.STOPPED and entry.system_request is not None:
                 files = [entry.system_request.local_dir / entry.system_request.local_file_name]
                 self._queue_request(_cleanup_files, args=(files, ))
-            self._notify_observers(required_value(requested_status), entry.serialize())
+            self._update_observers(required_value(requested_status), entry.serialize())
 
     def _handle_progress_changed(self,
                                  update_time: datetime,
@@ -519,7 +541,7 @@ class DownloadManager(DownloadListenerBase):
                 entry.state.downloaded_bytes = 0
             entry.state.downloaded_bytes += downloaded_bytes
             entry.state.last_update_time = update_time
-            self._notify_observers(EventType.PROGRESS_CHANGED, entry.serialize())
+            self._update_observers(EventType.PROGRESS_CHANGED, entry.serialize())
             logger.debug(f"progress for task {handle} changed: {downloaded_bytes} bytes")
 
     def _queue_request(self,
@@ -594,12 +616,16 @@ class DownloadManager(DownloadListenerBase):
                 logger.debug(f"request end [success]: {result}")
             except Exception as e:
                 logger.error(f"failure while executing request {request}: {e}\n{traceback.format_exc()}")
-                notification = _GeneralNotification("error", str(e))
-                self._notify_observers(EventType.GENERAL_NOTIFICATION, notification.serialize())
+                self._notify_observers(Severity.ERROR, str(e))
                 request.future_result.set_error(e)
                 logger.debug(f"request end [failure]: {e}")
 
-    def _notify_observers(self, *args, **kwargs):
+    def _notify_observers(self, severity: Severity, message: str):
+        notification = GeneralNotification(severity, message)
+        logger.debug(f"notifying observers: {notification.serialize()}")
+        self._update_observers(EventType.GENERAL_NOTIFICATION, notification.serialize())
+
+    def _update_observers(self, *args, **kwargs):
         for observer in self._observers:
             observer.handle_event(DownloadManagerEvent(*args, **kwargs))
 

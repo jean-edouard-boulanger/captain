@@ -19,6 +19,8 @@ import StartDownload from './StartDownload';
 import DownloadsTable from "./DownloadsTable";
 import NotConnected from "./NotConnected";
 
+import makeController from "./Controller";
+
 import './App.css';
 
 
@@ -47,57 +49,6 @@ function getServerEndpoint() {
 }
 
 
-function makeController(socket) {
-  return {
-    pauseDownload: (handle) => {
-      socket.emit("pause_download", {"handle": handle})
-    },
-    resumeDownload: (handle) => {
-      socket.emit("resume_download", {"handle": handle})
-    },
-    stopDownload: (handle) => {
-      socket.emit("stop_download", {"handle": handle})
-    },
-    retryDownload: (handle) => {
-      socket.emit("retry_download", {"handle": handle})
-    },
-    rescheduleDownload: (handle, startAt) => {
-      socket.emit("reschedule_download", {
-        "handle": handle,
-        "start_at": startAt.toISOString()
-      })
-    },
-    removeDownload: (handle) => {
-      socket.emit("remove_download", {"handle": handle})
-    },
-    startDownload: (data) => {
-      const download = data.download;
-      const makeAuth = () => {
-        if(download.authMode === "none" || download.authMode === null)
-        {
-          return null;
-        }
-        let auth = {};
-        auth[download.authMode] = download.credentials;
-        return auth;
-      };
-      const makeStartAt = () => {
-        if(data.schedule === null) {
-          return null;
-        }
-        return data.schedule.toISOString()
-      };
-      socket.emit("start_download", {
-        remote_file_url: download.remoteFileUrl,
-        local_dir: download.localDir,
-        local_file_name: download.renameTo,
-        start_at: makeStartAt(),
-        auth: makeAuth()
-      });
-    }
-  }
-}
-
 function App() {
   const [socket, setSocket] = useState(null);
   const [controller, setController] = useState(null);
@@ -115,7 +66,8 @@ function App() {
 
   useEffect(() => {
     if(socket === null) { return; }
-    setController(makeController(socket));
+    const controller = makeController(socket);
+    setController(controller);
   }, [socket])
 
   useEffect(() => {
@@ -137,11 +89,12 @@ function App() {
         };
       }));
     });
+
     socket.on("download_event", data => {
       if(data.event_type === "GENERAL_NOTIFICATION") {
         setNotification({
           message: data.payload.message,
-          severity: data.payload.severity
+          severity: data.payload.severity.toLowerCase()
         });
         return;
       }
@@ -210,7 +163,8 @@ function App() {
                                controller.startDownload(data);
                              }}
                              onCancel={() => setDisplayNewTaskForm(false)}
-                             settings={settings} />
+                             settings={settings}
+                             controller={controller} />
             </Grid>
           </Collapse>
           <Grid item xs={12}>

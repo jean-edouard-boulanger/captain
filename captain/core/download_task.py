@@ -13,6 +13,7 @@ from dataclasses import dataclass
 from urllib.parse import urlparse, unquote
 from threading import Event, Thread
 from datetime import datetime, timedelta
+import requests.exceptions
 import requests
 import traceback
 import logging
@@ -34,6 +35,20 @@ def _get_next_chunk(download_iter):
 
 def _make_range_header(rng: DataRange):
     return f"bytes={rng.first_byte or 0}-{rng.last_byte or str()}"
+
+
+def _format_error(e: Exception):
+    default_error = "network error"
+    logger.info(type(e))
+    if isinstance(e, requests.exceptions.RequestException):
+        if e.response is None:
+            return default_error
+        response: requests.Response = e.response
+        if response.status_code == 404:
+            return "remote resource does not exist"
+        if response.status_code == 401:
+            return "not authorized to download resource"
+    return default_error
 
 
 @dataclass
@@ -90,8 +105,6 @@ class DownloadTask(object):
         self._sink = sink or NoOpDownloadSink()
         self._listener = listener or NoOpDownloadListener()
         self._stopped_flag = Event()
-        self._run_flag = Event()
-        self._was_paused = False
         self._progress_report_interval = progress_report_interval or timedelta(seconds=1)
 
     def _download_loop_impl(self, req, sink: DownloadSinkBase):
@@ -129,11 +142,10 @@ class DownloadTask(object):
             logger.error(f"while downloading file: {e}\n{traceback.format_exc()}")
             self._listener.download_errored(
                 datetime.now(), self._handle,
-                ErrorInfo(f"while downloading file: {e}",
+                ErrorInfo(f"Could not download '{self._request.remote_file_name}': {_format_error(e)}",
                           traceback.format_exc()))
 
     def run_impl(self):
-        self._run_flag.set()
         settings = self._request
         url_meta = urlparse(settings.remote_file_url)
         remote_file_name = unquote(os.path.basename(url_meta.path))
@@ -163,7 +175,7 @@ class DownloadTask(object):
             logger.error(f"while initializing download: {e}\n{traceback.format_exc()}")
             self._listener.download_errored(
                 datetime.now(), self._handle,
-                ErrorInfo(f"while initializing download: {e}",
+                ErrorInfo(f"Could not download '{self._request.remote_file_name}': {_format_error(e)}",
                           traceback.format_exc()))
 
     def stop(self):
@@ -176,7 +188,7 @@ class ThreadedDownloadTask(Thread):
         super().__init__()
         self._task = task
 
-    def run(self) -> None:
+    def run(self):
         self._task.run()
 
     def stop(self):
