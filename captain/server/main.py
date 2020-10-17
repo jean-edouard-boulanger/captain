@@ -150,7 +150,7 @@ def handle_ping_request(_, request):
     if not directory.is_dir():
         return {
             "valid": False,
-            "reason": "This directory does not exist"
+            "reason": "Does not exist or is not a directory"
         }
     if not os.access(directory, os.W_OK):
         return {

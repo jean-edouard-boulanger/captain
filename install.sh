@@ -1,6 +1,11 @@
 #!/usr/bin/env bash
 set -e
 
+if [ "$EUID" -ne 0 ]
+  then echo "Please run as root: sudo make install"
+  exit
+fi
+
 CAPTAIN_USER=captain
 getent group ${CAPTAIN_USER} >/dev/null 2>&1 || groupadd ${CAPTAIN_USER}
 id -u ${CAPTAIN_USER} >/dev/null 2>&1 || useradd -d /home/${CAPTAIN_USER} -g ${CAPTAIN_USER} -m ${CAPTAIN_USER}
