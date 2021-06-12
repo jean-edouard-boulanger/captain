@@ -443,6 +443,10 @@ class DownloadManager(DownloadListenerBase):
         if not self._db.has_entry(handle):
             raise DownloadManagerError(f"download entry not found: {handle.handle}")
         entry = self._db.get_entry(handle)
+        if delete_file and entry.state.file_location and os.path.isfile(entry.state.file_location):
+            logger.info(f"deleting downloaded file at location: {entry.state.file_location}")
+            os.remove(entry.state.file_location)
+            entry.state.file_location = None
         self._db.remove_entry(handle)
         self._notify_observers(Severity.INFO, f"Removed '{entry.user_request.remote_file_name}' from the list")
         logger.debug(f"removed task: {handle}")

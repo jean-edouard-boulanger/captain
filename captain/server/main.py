@@ -133,9 +133,11 @@ async def on_start_download(_, data):
 @sio.on("remove_download")
 async def on_start_download(_, data):
     logger.info(f"remove download: {data}")
-    handle = DownloadHandle(data["handle"])
     manager = get_manager()
-    manager.remove_download(handle, blocking=True)
+    manager.remove_download(
+        handle=DownloadHandle(data["handle"]),
+        delete_file=data.get("delete_file", False),
+        blocking=True)
     await sio.emit("recap", build_recap(manager))
 
 

@@ -67,8 +67,11 @@ export function makeController(socket) {
         "start_at": startAt.toISOString()
       })
     },
-    removeDownload: (handle) => {
-      socket.emit("remove_download", {"handle": handle})
+    removeDownload: ({handle, deleteFile}) => {
+      socket.emit("remove_download", {
+        "handle": handle,
+        "delete_file": deleteFile ?? false
+      });
     },
     startDownload: (data) => {
       const download = data.download;
