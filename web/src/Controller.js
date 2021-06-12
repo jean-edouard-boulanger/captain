@@ -1,7 +1,7 @@
 import {v4 as uuidv4} from "uuid";
 
 
-export default function makeController(socket) {
+export function makeController(socket) {
   const m_contexts = {};
 
   const handleRpcResponse = (payload) => {
