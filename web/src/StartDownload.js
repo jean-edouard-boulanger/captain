@@ -27,7 +27,7 @@ function defaultCredentials() {
   return {username: null, password: null};
 }
 
-export default function StartDownload({onStart, onCancel, settings, controller}) {
+export function StartDownload({onStart, onCancel, settings, controller}) {
   const [remoteFileUrl, setRemoteFileUrl] = useState(null);
   const [saveTo, setSaveTo] = useState("system-auto");
   const [localDir, setLocalDir] = useState(null);

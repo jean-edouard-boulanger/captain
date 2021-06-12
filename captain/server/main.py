@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import Callable
 from asyncio import Queue
 from aiohttp import web
+import aiohttp
 import yaml
 import argparse
 import threading
@@ -145,7 +146,7 @@ async def connect(sid, _):
 
 
 @rpc.on("validate_download_directory")
-def handle_ping_request(_, request):
+def handle_validate_download_directory(_, request):
     directory = Path(request["directory"]).expanduser()
     if not directory.is_dir():
         return {
@@ -158,6 +159,36 @@ def handle_ping_request(_, request):
             "reason": "This directory is not writable"
         }
     return {"valid": True}
+
+
+@aiohttp.streamer
+async def file_sender(writer, file_path=None):
+    with open(file_path, 'rb') as f:
+        chunk = f.read(2 ** 16)
+        while chunk:
+            await writer.write(chunk)
+            chunk = f.read(2 ** 16)
+
+
+async def download_handler(request):
+    handle = DownloadHandle(request.match_info['handle'])
+    entry = get_manager().get_download(
+        handle=handle, blocking=True)
+    download_status = entry["state"]["status"]
+    logger.info(entry["state"])
+    if entry["state"]["status"] != "COMPLETE" or not entry["state"]["file_location"]:
+        return web.Response(
+            body=f"file for download '{handle.handle}' cannot be downloaded (download status: {download_status})",
+            status=404
+        )
+    file_path = Path(entry["state"]["file_location"])
+    headers = {
+        "Content-disposition": f"attachment; filename={file_path.name}"
+    }
+    return web.Response(
+        body=file_sender(file_path=file_path),
+        headers=headers
+    )
 
 
 def get_arguments_parser():
@@ -178,6 +209,7 @@ def main():
     start_manager()
     logger.info("download manager started")
     app = web.Application()
+    app.router.add_get("/download/{handle}", download_handler)
     sio.attach(app)
     sio.start_background_task(sio_publisher, shared_queue, sio.emit)
     logger.info("publisher started")

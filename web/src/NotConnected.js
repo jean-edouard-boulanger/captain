@@ -6,7 +6,7 @@ import {
 } from "@material-ui/core";
 
 
-export default function NotConnected({connection}) {
+export function NotConnected({connection}) {
   return (
     <Card>
       <CardContent>

@@ -19,9 +19,12 @@ import PlayArrowIcon from "@material-ui/icons/PlayArrow";
 import StopIcon from "@material-ui/icons/Stop";
 import ReplayIcon from "@material-ui/icons/Replay";
 import ClearIcon from "@material-ui/icons/Clear";
+import GetAppIcon from '@material-ui/icons/GetApp';
 import React, {useState} from "react";
 import ScheduleDialog from "./ScheduleDialog";
 import {format as format_date} from 'date-fns';
+
+import { getServerEndpoint } from './endpoint';
 
 
 function convertBytes(bps)
@@ -43,7 +46,7 @@ function defaultMetadata()
 }
 
 
-export default function DownloadsTable(props) {
+export function DownloadsTable(props) {
   const [actionMenu, setActionMenu] = useState(null);
   const [scheduleDialog, setScheduleDialog] = useState(null);
 
@@ -186,6 +189,20 @@ export default function DownloadsTable(props) {
                           <ClearIcon fontSize="small" />
                         </ListItemIcon>
                         <Typography variant="inherit">Remove</Typography>
+                      </MenuItem>
+                    }
+                    {
+                      (state.properties.can_be_downloaded) &&
+                      <MenuItem onClick={() => {
+                        closeActionMenu();
+                        const anchor = document.createElement('a');
+                        anchor.href = `http://${getServerEndpoint()}/download/${handle}`;
+                        anchor.click();
+                      }}>
+                        <ListItemIcon>
+                          <GetAppIcon fontSize="small" />
+                        </ListItemIcon>
+                        <Typography variant="inherit">Download</Typography>
                       </MenuItem>
                     }
                   </Menu>

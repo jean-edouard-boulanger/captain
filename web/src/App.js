@@ -15,11 +15,12 @@ import ClearIcon from '@material-ui/icons/Clear';
 import AddCircleIcon from '@material-ui/icons/AddCircle';
 import socketIOClient from 'socket.io-client'
 
-import StartDownload from './StartDownload';
-import DownloadsTable from "./DownloadsTable";
-import NotConnected from "./NotConnected";
+import { StartDownload } from './StartDownload';
+import { DownloadsTable } from "./DownloadsTable";
+import { NotConnected } from "./NotConnected";
 
-import makeController from "./Controller";
+import { getServerEndpoint } from './endpoint';
+import { makeController } from "./Controller";
 
 import './App.css';
 
@@ -37,15 +38,6 @@ const ConnectState = {
 
 function Alert(props) {
   return <MuiAlert elevation={6} variant="filled" {...props} />;
-}
-
-
-function getServerEndpoint() {
-  const endpoint = process.env.REACT_APP_CAPTAIN_SERVER_ENDPOINT;
-  if(endpoint !== undefined) {
-    return endpoint;
-  }
-  return "http://127.0.0.1:5001";
 }
 
 

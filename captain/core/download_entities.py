@@ -1,3 +1,4 @@
+from typing import Any, Dict
 from requests.auth import HTTPBasicAuth, HTTPProxyAuth, HTTPDigestAuth
 from dateutil.parser import parse as parse_date
 from typing import Optional, Dict, Union
@@ -178,6 +179,7 @@ class DownloadState:
     schedule_handle: Optional[int] = None
     downloaded_bytes: Optional[int] = None
     current_rate: Optional[float] = None
+    file_location: Optional[Path] = None
     requested_status: Optional[DownloadStatus] = None
     last_update_time: Optional[datetime] = None
     start_time: Optional[datetime] = None
@@ -193,42 +195,47 @@ class DownloadState:
         }
 
     @property
-    def is_active(self):
+    def is_active(self) -> bool:
         return self.status == DownloadStatus.ACTIVE
 
     @property
-    def can_be_resumed(self):
+    def can_be_resumed(self) -> bool:
         return (self.status == DownloadStatus.PAUSED
                 and self.requested_status is None
                 and self.metadata is not None
                 and self.metadata.file_size is not None)
 
     @property
-    def can_be_paused(self):
+    def can_be_paused(self) -> bool:
         return (self.status == DownloadStatus.ACTIVE
                 and self.requested_status is None
                 and self.metadata is not None
                 and self.metadata.accept_ranges)
 
     @property
-    def can_be_stopped(self):
+    def can_be_stopped(self) -> bool:
         return (self.status in {DownloadStatus.ACTIVE, DownloadStatus.PAUSED, DownloadStatus.SCHEDULED}
                 and self.requested_status is None)
 
     @property
-    def can_be_retried(self):
+    def can_be_retried(self) -> bool:
         return self.status in {DownloadStatus.STOPPED, DownloadStatus.ERROR}
 
     @property
-    def can_be_rescheduled(self):
+    def can_be_rescheduled(self) -> bool:
         return self.status == DownloadStatus.SCHEDULED
 
-    def serialize(self):
+    @property
+    def can_be_downloaded(self) -> bool:
+        return self.status == DownloadStatus.COMPLETE and self.file_location is not None
+
+    def serialize(self) -> Dict[str, Any]:
         return {
             "metadata": self.metadata.serialize() if self.metadata else None,
             "downloaded_bytes": self.downloaded_bytes,
             "current_rate": self.current_rate,
             "status": self.status.name,
+            "file_location": self.file_location,
             "start_time": self.start_time.isoformat() if self.start_time else None,
             "end_time": self.end_time.isoformat() if self.end_time else None,
             "error_info": self.error_info.serialize() if self.error_info else None,
@@ -238,7 +245,8 @@ class DownloadState:
                 "can_be_paused": self.can_be_paused,
                 "can_be_stopped": self.can_be_stopped,
                 "can_be_retried": self.can_be_retried,
-                "can_be_rescheduled": self.can_be_rescheduled
+                "can_be_rescheduled": self.can_be_rescheduled,
+                "can_be_downloaded": self.can_be_downloaded
             }
         }
 
@@ -250,6 +258,7 @@ class DownloadState:
             metadata=DownloadMetadata.deserialize(data["metadata"]),
             downloaded_bytes=data["downloaded_bytes"],
             current_rate=data["current_rate"],
+            file_location=data.get("file_location"),
             status=DownloadStatus[data["status"]],
             start_time=parse_date(data["start_time"]) if data["start_time"] else None,
             end_time=parse_date(data["end_time"]) if data["end_time"] else None,

@@ -235,10 +235,11 @@ class DownloadManager(DownloadListenerBase):
     @public_endpoint
     def remove_download(self,
                         handle: DownloadHandle,
+                        delete_file: Optional[bool] = False,
                         blocking: Optional[bool] = False):
         return self._queue_request(
             self._handle_remove_download,
-            args=(handle, ), blocking=blocking)
+            args=(handle, delete_file), blocking=blocking)
 
     @public_endpoint
     def get_download(self,
@@ -254,6 +255,14 @@ class DownloadManager(DownloadListenerBase):
         return self._queue_request(
             self._handle_get_downloads,
             blocking=blocking)
+
+    @public_endpoint
+    def get_downloaded_file_path(self,
+                                 handle: DownloadHandle,
+                                 blocking: Optional[bool] = False):
+        return self._queue_request(
+            self._handle_get_downloaded_file_path,
+            args=(handle, ), blocking=blocking)
 
     @public_endpoint
     def retry_download(self,
@@ -430,7 +439,7 @@ class DownloadManager(DownloadListenerBase):
             self._tasks[handle].start()
             logger.info(f"resuming task {handle} from byte {entry.state.downloaded_bytes}")
 
-    def _handle_remove_download(self, handle: DownloadHandle):
+    def _handle_remove_download(self, handle: DownloadHandle, delete_file: bool):
         if not self._db.has_entry(handle):
             raise DownloadManagerError(f"download entry not found: {handle.handle}")
         entry = self._db.get_entry(handle)
@@ -448,6 +457,12 @@ class DownloadManager(DownloadListenerBase):
             entry.serialize() for entry
             in self._db.get_all_entries()
         ]
+
+    def _handle_get_downloaded_file_path(self, handle: DownloadHandle) -> Optional[Path]:
+        if not self._db.has_entry(handle):
+            raise DownloadManagerError(f"download entry not found: {handle.handle}")
+        entry = self._db.get_entry(handle)
+        return entry.state.file_location
 
     def _handle_download_started(self,
                                  update_time: datetime,
@@ -500,6 +515,7 @@ class DownloadManager(DownloadListenerBase):
             dest_file_path = local_dir / local_file_name
             logger.info(f"moving temporary file {temp_file_path} to {dest_file_path}")
             shutil.move(str(temp_file_path), str(dest_file_path))
+            entry.state.file_location = str(dest_file_path)
             entry.state.status = DownloadStatus.COMPLETE
             entry.state.end_time = datetime.now()
             entry.state.last_update_time = update_time
