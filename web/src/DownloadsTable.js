@@ -20,6 +20,7 @@ import StopIcon from "@material-ui/icons/Stop";
 import ReplayIcon from "@material-ui/icons/Replay";
 import ClearIcon from "@material-ui/icons/Clear";
 import GetAppIcon from '@material-ui/icons/GetApp';
+import DeleteForeverIcon from '@material-ui/icons/DeleteForever';
 import React, {useState} from "react";
 import ScheduleDialog from "./ScheduleDialog";
 import {format as format_date} from 'date-fns';
@@ -184,11 +185,26 @@ export function DownloadsTable(props) {
                     }
                     {
                       (state.properties.is_final) &&
-                      <MenuItem onClick={() => {closeActionMenu(); controller.removeDownload(handle)}}>
+                      <MenuItem onClick={() => {
+                        closeActionMenu();
+                        controller.removeDownload({handle, deleteFile: false})
+                      }}>
                         <ListItemIcon>
                           <ClearIcon fontSize="small" />
                         </ListItemIcon>
                         <Typography variant="inherit">Remove</Typography>
+                      </MenuItem>
+                    }
+                    {
+                      (state.properties.is_final) &&
+                      <MenuItem onClick={() => {
+                        closeActionMenu();
+                        controller.removeDownload({handle, deleteFile: true})
+                      }}>
+                        <ListItemIcon>
+                          <DeleteForeverIcon fontSize="small" />
+                        </ListItemIcon>
+                        <Typography variant="inherit">Remove with data</Typography>
                       </MenuItem>
                     }
                     {
