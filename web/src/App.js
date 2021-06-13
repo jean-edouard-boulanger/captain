@@ -42,6 +42,7 @@ function Alert(props) {
 
 
 function App() {
+  const [endpoint] = useState(() => getServerEndpoint());
   const [socket, setSocket] = useState(null);
   const [controller, setController] = useState(null);
   const [connectState, setConnectState] = useState(ConnectState.DISCONNECT);
@@ -51,16 +52,10 @@ function App() {
   const [notification, setNotification] = useState(null);
 
   useEffect(() => {
-    const endpoint = getServerEndpoint();
-    console.log("captain server endpoint", endpoint);
-    setSocket(socketIOClient(endpoint));
-  }, []);
-
-  useEffect(() => {
-    if(socket === null) { return; }
-    const controller = makeController(socket);
-    setController(controller);
-  }, [socket])
+    const newSocket = socketIOClient(endpoint);
+    setSocket(newSocket);
+    setController(makeController({ endpoint, socket: newSocket }))
+  }, [endpoint]);
 
   useEffect(() => {
     if(socket === null) { return; }

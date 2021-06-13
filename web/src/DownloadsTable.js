@@ -196,7 +196,7 @@ export function DownloadsTable(props) {
                       </MenuItem>
                     }
                     {
-                      (state.properties.is_final) &&
+                      (state.properties.is_final && state.file_location !== null) &&
                       <MenuItem onClick={() => {
                         closeActionMenu();
                         controller.removeDownload({handle, deleteFile: true})
@@ -212,7 +212,7 @@ export function DownloadsTable(props) {
                       <MenuItem onClick={() => {
                         closeActionMenu();
                         const anchor = document.createElement('a');
-                        anchor.href = `http://${getServerEndpoint()}/download/${handle}`;
+                        anchor.href = controller.getDownloadedFileUrl(handle);
                         anchor.click();
                       }}>
                         <ListItemIcon>

@@ -1,7 +1,7 @@
 import {v4 as uuidv4} from "uuid";
 
 
-export function makeController(socket) {
+export function makeController({endpoint, socket}) {
   const m_contexts = {};
 
   const handleRpcResponse = (payload) => {
@@ -45,7 +45,6 @@ export function makeController(socket) {
     return promise;
   }
 
-  const sendRequest = handleRpcRequest;
   socket.on("rpc_response", handleRpcResponse);
 
   return {
@@ -99,11 +98,14 @@ export function makeController(socket) {
       });
     },
     validateDirectory: (directory) => {
-      return sendRequest({
+      return handleRpcRequest({
         validate_download_directory: {
           directory
         }
       })
+    },
+    getDownloadedFileUrl: (downloadHandle) => {
+      return `http://${endpoint}/download/${downloadHandle}`
     }
   }
 }
