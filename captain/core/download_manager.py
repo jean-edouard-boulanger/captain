@@ -17,9 +17,10 @@ from .download_entities import (
 from .invariant import invariant, required_value
 from .future import Future
 
+from send2trash import send2trash
 from dataclasses import dataclass
 from datetime import datetime, timedelta
-from typing import Dict, Any, Optional, Callable, Tuple, List, Protocol
+from typing import Dict, Any, Optional, Callable, Tuple, List, Union, Protocol
 from functools import partial, wraps
 from pathlib import Path
 from queue import Queue
@@ -103,10 +104,22 @@ def _pop_queue(the_queue: Queue, timeout: timedelta):
         return None
 
 
-def _cleanup_files(files: List[Path]):
+def _send_file_to_trash(path: Union[Path, str]):
+    if not Path(path).is_file():
+        raise RuntimeError(f"{path} does not exist or is not a file")
+    send2trash(str(path))
+
+
+def _cleanup_files(files: List[Union[Path, str]], permanent: bool):
+    assert isinstance(files, list)
+    cleanup_strategy = os.remove if permanent else _send_file_to_trash
     for current_file in files:
         logger.info(f"cleaning up: {current_file}")
-        os.remove(str(current_file))
+        try:
+            cleanup_strategy(str(current_file))
+        except Exception as e:
+            logger.warning(f"failed to remove file={str(current_file)} "
+                           f"with strategy={cleanup_strategy.__name__}: {e}")
 
 
 class Severity(enum.Enum):
@@ -444,9 +457,7 @@ class DownloadManager(DownloadListenerBase):
             raise DownloadManagerError(f"download entry not found: {handle.handle}")
         entry = self._db.get_entry(handle)
         if delete_file and entry.state.file_location and os.path.isfile(entry.state.file_location):
-            logger.info(f"deleting downloaded file at location: {entry.state.file_location}")
-            os.remove(entry.state.file_location)
-            entry.state.file_location = None
+            self._queue_request(_cleanup_files, args=([entry.state.file_location],), kwargs={"permanent": False})
         self._db.remove_entry(handle)
         self._notify_observers(Severity.INFO, f"Removed '{entry.user_request.remote_file_name}' from the list")
         logger.debug(f"removed task: {handle}")
@@ -545,7 +556,7 @@ class DownloadManager(DownloadListenerBase):
             entry.state.end_time = update_time
             if requested_status == DownloadStatus.STOPPED and entry.system_request is not None:
                 files = [entry.system_request.local_dir / entry.system_request.local_file_name]
-                self._queue_request(_cleanup_files, args=(files, ))
+                self._queue_request(_cleanup_files, args=(files,), kwargs={"permanent": True})
             self._update_observers(required_value(requested_status), entry.serialize())
 
     def _handle_progress_changed(self,
