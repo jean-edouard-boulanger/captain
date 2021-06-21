@@ -25,8 +25,6 @@ import React, {useState} from "react";
 import ScheduleDialog from "./ScheduleDialog";
 import {format as format_date} from 'date-fns';
 
-import { getServerEndpoint } from './endpoint';
-
 
 function convertBytes(bps)
 {
@@ -230,7 +228,6 @@ export function DownloadsTable(props) {
                     {
                       getActionMenuSections({ entry: payload, controller }).map((items) => {
                         return items.map((item) => {
-                          const Icon = item.Icon;
                           return (
                               <MenuItem
                                 onClick={() => {
@@ -242,7 +239,7 @@ export function DownloadsTable(props) {
                                 }}
                               >
                                 <ListItemIcon>
-                                  <Icon fontSize="small"/>
+                                  <item.Icon fontSize="small"/>
                                 </ListItemIcon>
                                 <Typography variant="inherit">{item.text}</Typography>
                               </MenuItem>
