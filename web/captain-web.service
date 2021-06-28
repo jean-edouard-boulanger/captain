@@ -8,7 +8,7 @@ Type=simple
 Restart=always
 RestartSec=1
 User=captain
-ExecStart=/usr/local/bin/serve -s /usr/local/bin/captain/web/build/
+ExecStart=/usr/local/bin/serve -l 4000 -s /usr/local/bin/captain/web/build/
 
 [Install]
 WantedBy=multi-user.target
