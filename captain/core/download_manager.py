@@ -59,6 +59,8 @@ class DownloadDirectory:
 
 @dataclass
 class DownloadManagerSettings:
+    listen_host: str
+    listen_port: int
     temp_download_dir: Path
     download_directories: List[DownloadDirectory]
     shutdown_timeout: timedelta
@@ -67,6 +69,8 @@ class DownloadManagerSettings:
 
     def serialize(self) -> Dict:
         return {
+            "listen_host": self.listen_host,
+            "listen_port": self.listen_port,
             "temp_download_dir": str(self.temp_download_dir.absolute()),
             "download_directories": [dd.serialize() for dd in self.download_directories],
             "shutdown_timeout": self.shutdown_timeout.total_seconds(),
@@ -77,6 +81,8 @@ class DownloadManagerSettings:
     @staticmethod
     def deserialize(data) -> "DownloadManagerSettings":
         return DownloadManagerSettings(
+            listen_host=data.get("listen_host", "0.0.0.0"),
+            listen_port=data.get("listen_port", 4001),
             temp_download_dir=Path(data.get("temp_download_dir", "/tmp")).expanduser(),
             download_directories=[DownloadDirectory.deserialize(item) for item in data["download_directories"]],
             shutdown_timeout=timedelta(seconds=data.get("shutdown_timeout", 10)),
