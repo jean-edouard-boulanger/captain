@@ -2,6 +2,7 @@ from typing import Any, Optional, Union
 from pathlib import PurePath
 from datetime import datetime, date
 import decimal
+import json
 
 
 def serialize(data: Any) -> Any:
@@ -31,3 +32,7 @@ def serializer(func):
     def impl(*args, **kwargs):
         return serialize(func(*args, **kwargs))
     return impl
+
+
+def pretty_dump(data: Any) -> str:
+    return json.dumps(serialize(data), indent=4, sort_keys=True)

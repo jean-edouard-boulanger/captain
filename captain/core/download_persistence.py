@@ -1,7 +1,4 @@
-from .download_entities import (
-    DownloadHandle,
-    DownloadEntry
-)
+from .download_entities import DownloadHandle, DownloadEntry
 
 from typing import Protocol, Dict, List, Optional, ContextManager
 from contextlib import contextmanager
@@ -10,6 +7,7 @@ import enum
 import json
 import logging
 import traceback
+import sqlite3
 
 
 logger = logging.getLogger("persistence")
@@ -44,17 +42,23 @@ class PersistenceBase(Protocol):
 class InMemoryPersistence(PersistenceBase):
     def __init__(self, persist_file_path: Optional[str] = None):
         self._db: Dict[DownloadHandle, DownloadEntry] = dict()
-        self._persist_file_path = Path(persist_file_path).expanduser() if persist_file_path else None
+        self._persist_file_path = (
+            Path(persist_file_path).expanduser() if persist_file_path else None
+        )
         if self._persist_file_path and self._persist_file_path.is_file():
             try:
                 with self._persist_file_path.open() as df:
                     data: Dict = json.load(df)
                     self._db = {
-                        DownloadHandle(handle_str): DownloadEntry.deserialize(entry_data)
+                        DownloadHandle(handle_str): DownloadEntry.deserialize(
+                            entry_data
+                        )
                         for handle_str, entry_data in data.items()
                     }
             except Exception as e:
-                logger.warning(f"failed to load persisted state: {e}\n{traceback.format_exc()}")
+                logger.warning(
+                    f"failed to load persisted state: {e}\n{traceback.format_exc()}"
+                )
 
     def has_entry(self, handle: DownloadHandle) -> bool:
         return handle in self._db
@@ -65,27 +69,109 @@ class InMemoryPersistence(PersistenceBase):
     def get_all_entries(self) -> List[DownloadEntry]:
         return list(self._db.values())
 
-    def remove_entry(self, handle):
+    def remove_entry(self, handle) -> None:
         del self._db[handle]
 
-    def persist_entry(self, entry: DownloadEntry):
+    def persist_entry(self, entry: DownloadEntry) -> None:
         self._db[entry.handle] = entry
 
     def flush(self):
         if self._persist_file_path:
             with self._persist_file_path.open("w") as df:
                 output = {
-                    str(handle): entry.serialize()
-                    for handle, entry in self._db.items()
+                    str(handle): entry.serialize() for handle, entry in self._db.items()
                 }
                 df.write(json.dumps(output, indent=4))
 
 
+class SQLitePersistence(PersistenceBase):
+    def __init__(self, database_file_path: str):
+        self._conn = sqlite3.connect(database_file_path)
+        self._conn.row_factory = SQLitePersistence._dict_factory
+        self._init_db()
+
+    def has_entry(self, handle: DownloadHandle) -> bool:
+        cursor = self._cursor()
+        cursor.execute(
+            """
+            SELECT COUNT(*) AS count FROM download_entries
+             WHERE handle = :handle
+        """,
+            {"handle": str(handle)},
+        )
+        row = cursor.fetchone()
+        return row["count"] == 1
+
+    def get_entry(self, handle: DownloadHandle) -> DownloadEntry:
+        cursor = self._cursor()
+        cursor.execute(
+            """
+            SELECT payload FROM download_entries
+             WHERE handle = :handle;
+        """,
+            {"handle": str(handle)},
+        )
+        row = cursor.fetchone()
+        return DownloadEntry.deserialize(json.loads(row["payload"]))
+
+    def get_all_entries(self) -> List[DownloadEntry]:
+        cursor = self._cursor()
+        cursor.execute("SELECT payload FROM download_entries")
+        return [DownloadEntry.deserialize(json.loads(row["payload"])) for row in cursor]
+
+    def remove_entry(self, handle) -> None:
+        cursor = self._cursor()
+        cursor.execute(
+            """
+            DELETE FROM download_entries
+             WHERE handle = :handle;
+        """,
+            {"handle": str(handle)},
+        )
+
+    def persist_entry(self, entry: DownloadEntry) -> None:
+        cursor = self._cursor()
+        cursor.execute(
+            """
+            INSERT INTO download_entries (handle, payload)
+            VALUES (:handle, :payload)
+            ON CONFLICT(handle) DO UPDATE SET payload = excluded.payload;
+        """,
+            {"handle": str(entry.handle), "payload": json.dumps(entry.serialize())},
+        )
+
+    def flush(self):
+        pass
+
+    def _cursor(self):
+        return self._conn.cursor()
+
+    @staticmethod
+    def _dict_factory(cursor, row):
+        d = {}
+        for idx, col in enumerate(cursor.description):
+            d[col[0]] = row[idx]
+        return d
+
+    def _init_db(self):
+        self._cursor().execute(
+            """
+            CREATE TABLE IF NOT EXISTS download_entries (
+                handle CHAR(36) PRIMARY KEY ,
+                payload BLOB
+            );
+        """
+        )
+
+
 class PersistenceType(enum.Enum):
     IN_MEMORY = enum.auto()
+    SQLITE = enum.auto()
 
 
 def get_persistence(persistence_type: PersistenceType, **kwargs):
     if persistence_type == PersistenceType.IN_MEMORY:
         return InMemoryPersistence(**kwargs)
+    if persistence_type == PersistenceType.SQLITE:
+        return SQLitePersistence(**kwargs)
     raise KeyError(f"unsupported persistence type: {persistence_type}")
