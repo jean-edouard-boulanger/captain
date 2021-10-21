@@ -115,7 +115,7 @@ class DownloadRequest:
             local_file_name=data.get("local_file_name"),
             start_at=parse_date(data.get("start_at")) if data.get("start_at") else None,
             auth=_deserialize_auth(data.get("auth")),
-            data_range=DataRange.deserialize(data)
+            data_range=DataRange.deserialize(data.get("range"))
         )
 
 
