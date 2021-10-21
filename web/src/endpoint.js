@@ -3,5 +3,5 @@ export function getServerEndpoint() {
   if(endpoint !== undefined) {
     return endpoint;
   }
-  return "127.0.0.1:5001";
+  return "127.0.0.1:5004";
 }

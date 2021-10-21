@@ -1,7 +1,8 @@
-from typing import Any, Dict
+from captain.core.serialization import serializer
+
+from typing import Any, Optional, Dict, Union
 from requests.auth import HTTPBasicAuth, HTTPProxyAuth, HTTPDigestAuth
 from dateutil.parser import parse as parse_date
-from typing import Optional, Dict, Union
 from dataclasses import dataclass
 from urllib.parse import unquote
 from datetime import datetime
@@ -32,9 +33,9 @@ def _deserialize_auth(data) -> Optional[Auth]:
 class DownloadHandle(object):
     def __init__(self, handle: Union[uuid.UUID, str]):
         if isinstance(handle, uuid.UUID):
-            self.handle = handle
+            self._handle = handle
         if isinstance(handle, str):
-            self.handle = uuid.UUID(handle)
+            self._handle = uuid.UUID(handle)
 
     def __str__(self):
         return str(self.handle)
@@ -47,6 +48,10 @@ class DownloadHandle(object):
 
     def __eq__(self, other: 'DownloadHandle'):
         return self.handle == other.handle
+
+    @property
+    def handle(self) -> uuid.UUID:
+        return self._handle
 
     @staticmethod
     def make() -> 'DownloadHandle':
@@ -86,14 +91,15 @@ class DownloadRequest:
     def remote_file_name(self):
         return unquote(os.path.basename(self.remote_file_url))
 
+    @serializer
     def serialize(self) -> Dict:
         return {
             "remote_file_url": self.remote_file_url,
-            "local_dir": str(self.local_dir) if self.local_dir else None,
-            "local_file_name": str(self.local_file_name) if self.local_file_name else None,
-            "start_at": self.start_at.isoformat() if self.start_at else None,
+            "local_dir": self.local_dir,
+            "local_file_name": self.local_file_name,
+            "start_at": self.start_at,
             "has_auth": self.auth is not None,
-            "range": self.data_range.serialize() if self.data_range else None,
+            "range": self.data_range,
             "properties": {
                 "remote_file_name": self.remote_file_name
             }
@@ -118,6 +124,7 @@ class ErrorInfo:
     message: str
     stack: str
 
+    @serializer
     def serialize(self) -> Dict:
         return {
             "message": self.message,
@@ -151,6 +158,7 @@ class DownloadMetadata:
     file_type: Optional[str] = None
     accept_ranges: Optional[bool] = None
 
+    @serializer
     def serialize(self):
         return {
             "remote_url": self.remote_url,
@@ -229,16 +237,17 @@ class DownloadState:
     def can_be_downloaded(self) -> bool:
         return self.status == DownloadStatus.COMPLETE and self.file_location is not None
 
+    @serializer
     def serialize(self) -> Dict[str, Any]:
         return {
-            "metadata": self.metadata.serialize() if self.metadata else None,
+            "metadata": self.metadata,
             "downloaded_bytes": self.downloaded_bytes,
             "current_rate": self.current_rate,
             "status": self.status.name,
             "file_location": self.file_location,
-            "start_time": self.start_time.isoformat() if self.start_time else None,
-            "end_time": self.end_time.isoformat() if self.end_time else None,
-            "error_info": self.error_info.serialize() if self.error_info else None,
+            "start_time": self.start_time,
+            "end_time": self.end_time,
+            "error_info": self.error_info,
             "properties": {
                 "is_final": self.is_final,
                 "can_be_resumed": self.can_be_resumed,
@@ -273,12 +282,13 @@ class DownloadEntry:
     system_request: Optional[DownloadRequest]
     state: DownloadState
 
+    @serializer
     def serialize(self):
         return {
             "handle": str(self.handle),
-            "user_request": self.user_request.serialize(),
-            "system_request": self.system_request.serialize() if self.system_request else None,
-            "state": self.state.serialize()
+            "user_request": self.user_request,
+            "system_request": self.system_request,
+            "state": self.state
         }
 
     @staticmethod

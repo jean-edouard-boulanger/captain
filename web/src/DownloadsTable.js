@@ -1,5 +1,5 @@
 import {
-  Chip,
+  Chip, Divider,
   IconButton,
   LinearProgress,
   ListItemIcon,
@@ -25,8 +25,6 @@ import React, {useState} from "react";
 import ScheduleDialog from "./ScheduleDialog";
 import {format as format_date} from 'date-fns';
 
-import { getServerEndpoint } from './endpoint';
-
 
 function convertBytes(bps)
 {
@@ -46,6 +44,115 @@ function defaultMetadata()
   };
 }
 
+
+const ACTION_MENU = {
+  sections: [
+    {
+      items: [
+        {
+          text: 'Pause',
+          visible: ({state}) => state.properties.can_be_paused,
+          onClick: ({controller, handle}) => {
+            controller.pauseDownload(handle);
+          },
+          Icon: PauseIcon
+        },
+        {
+          text: 'Resume',
+          visible: ({state}) => state.properties.can_be_resumed,
+          onClick: ({controller, handle}) => {
+            controller.resumeDownload(handle);
+          },
+          Icon: PlayArrowIcon
+        },
+        {
+          text: 'Stop',
+          visible: ({state}) => state.properties.can_be_stopped,
+          onClick: ({controller, handle}) => {
+            controller.stopDownload(handle);
+          },
+          Icon: StopIcon
+        },
+        {
+          text: 'Retry',
+          visible: ({state}) => state.properties.can_be_retried,
+          onClick: ({controller, handle}) => {
+            controller.retryDownload(handle);
+          },
+          Icon: ReplayIcon
+        },
+        {
+          text: 'Start now',
+          visible: ({state}) => state.properties.can_be_rescheduled,
+          onClick: ({controller, handle}) => {
+            controller.rescheduleDownload(handle, new Date());
+          },
+          Icon: PlayArrowIcon
+        },
+        {
+          text: 'Reschedule',
+          visible: ({state}) => state.properties.can_be_rescheduled,
+          onClick: ({controller, handle}) => {
+            controller.rescheduleDownload(handle, new Date());
+          },
+          Icon: AccessAlarmIcon
+        }
+      ]
+    },
+    {
+      items: [
+        {
+          text: 'Download',
+          visible: ({state}) => state.properties.can_be_downloaded,
+          onClick: ({controller, handle}) => {
+            const anchor = document.createElement('a');
+            anchor.href = controller.getDownloadedFileUrl(handle);
+            anchor.click();
+          },
+          Icon: GetAppIcon
+        }
+      ]
+    },
+    {
+      items: [
+        {
+          text: 'Remove',
+          visible: ({state}) => state.properties.is_final,
+          onClick: ({controller, handle}) => {
+            controller.removeDownload({handle, deleteFile: false});
+          },
+          Icon: ClearIcon
+        },
+        {
+          text: 'Remove with data',
+          visible: ({state}) => {
+            return state.properties.is_final
+              && state.file_location !== null;
+          },
+          onClick: ({controller, handle}) => {
+            controller.removeDownload({handle, deleteFile: true});
+          },
+          Icon: DeleteForeverIcon
+        },
+      ]
+    }
+  ]
+}
+
+function getActionMenuSections({ entry, controller }) {
+  const handle = entry.handle;
+  const state = entry.state;
+  const sections = []
+  ACTION_MENU.sections.forEach((section) => {
+    const items = section.items.filter((item) => {
+      return item.visible({ state });
+    });
+    if(items.length > 0) {
+      sections.push(items);
+    }
+  });
+  return sections;
+}
 
 export function DownloadsTable(props) {
   const [actionMenu, setActionMenu] = useState(null);
@@ -119,107 +226,26 @@ export function DownloadsTable(props) {
                         open={isActionMenuOpen(handle)}
                         onClose={() => setActionMenu(null)} >
                     {
-                      (state.properties.can_be_paused) &&
-                      <MenuItem onClick={() => {closeActionMenu(); controller.pauseDownload(handle)}}>
-                        <ListItemIcon>
-                          <PauseIcon fontSize="small" />
-                        </ListItemIcon>
-                        <Typography variant="inherit">Pause</Typography>
-                      </MenuItem>
-                    }
-                    {
-                      (state.properties.can_be_resumed) &&
-                      <MenuItem onClick={() => {closeActionMenu(); controller.resumeDownload(handle)}}>
-                        <ListItemIcon>
-                          <PlayArrowIcon fontSize="small" />
-                        </ListItemIcon>
-                        <Typography variant="inherit">Resume</Typography>
-                      </MenuItem>
-                    }
-                    {
-                      (state.properties.can_be_stopped) &&
-                      <MenuItem onClick={() => {closeActionMenu(); controller.stopDownload(handle)}}>
-                        <ListItemIcon>
-                          <StopIcon fontSize="small" />
-                        </ListItemIcon>
-                        <Typography variant="inherit">Stop</Typography>
-                      </MenuItem>
-                    }
-                    {
-                      (state.properties.can_be_retried) &&
-                      <MenuItem onClick={() => {closeActionMenu(); controller.retryDownload(handle)}}>
-                        <ListItemIcon>
-                          <ReplayIcon fontSize="small" />
-                        </ListItemIcon>
-                        <Typography variant="inherit">Retry</Typography>
-                      </MenuItem>
-                    }
-                    {
-                      (state.properties.can_be_rescheduled) &&
-                      <MenuItem onClick={() => {
-                        closeActionMenu();
-                        controller.rescheduleDownload(handle, new Date())
-                      }}>
-                        <ListItemIcon>
-                          <PlayArrowIcon fontSize="small" />
-                        </ListItemIcon>
-                        <Typography variant="inherit">Start now</Typography>
-                      </MenuItem>
-                    }
-                    {
-                      (state.properties.can_be_rescheduled) &&
-                      <MenuItem onClick={() => {
-                        closeActionMenu();
-                        setScheduleDialog({
-                          initialSchedule: Date.parse(payload.user_request.start_at),
-                          onReschedule: ({schedule}) => {
-                            controller.rescheduleDownload(handle, schedule);
-                          }
-                        })
-                      }}>
-                        <ListItemIcon>
-                          <AccessAlarmIcon fontSize="small" />
-                        </ListItemIcon>
-                        <Typography variant="inherit">Reschedule</Typography>
-                      </MenuItem>
-                    }
-                    {
-                      (state.properties.is_final) &&
-                      <MenuItem onClick={() => {
-                        closeActionMenu();
-                        controller.removeDownload({handle, deleteFile: false})
-                      }}>
-                        <ListItemIcon>
-                          <ClearIcon fontSize="small" />
-                        </ListItemIcon>
-                        <Typography variant="inherit">Remove</Typography>
-                      </MenuItem>
-                    }
-                    {
-                      (state.properties.is_final && state.file_location !== null) &&
-                      <MenuItem onClick={() => {
-                        closeActionMenu();
-                        controller.removeDownload({handle, deleteFile: true})
-                      }}>
-                        <ListItemIcon>
-                          <DeleteForeverIcon fontSize="small" />
-                        </ListItemIcon>
-                        <Typography variant="inherit">Remove with data</Typography>
-                      </MenuItem>
-                    }
-                    {
-                      (state.properties.can_be_downloaded) &&
-                      <MenuItem onClick={() => {
-                        closeActionMenu();
-                        const anchor = document.createElement('a');
-                        anchor.href = controller.getDownloadedFileUrl(handle);
-                        anchor.click();
-                      }}>
-                        <ListItemIcon>
-                          <GetAppIcon fontSize="small" />
-                        </ListItemIcon>
-                        <Typography variant="inherit">Download</Typography>
-                      </MenuItem>
+                      getActionMenuSections({ entry: payload, controller }).map((items) => {
+                        return items.map((item) => {
+                          return (
+                              <MenuItem
+                                onClick={() => {
+                                  closeActionMenu();
+                                  item.onClick({
+                                    controller,
+                                    handle: payload.handle
+                                  });
+                                }}
+                              >
+                                <ListItemIcon>
+                                  <item.Icon fontSize="small"/>
+                                </ListItemIcon>
+                                <Typography variant="inherit">{item.text}</Typography>
+                              </MenuItem>
+                            )
+                        }).concat([<Divider />])
+                      })
                     }
                   </Menu>
                 </TableCell>
