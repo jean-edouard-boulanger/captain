@@ -13,9 +13,9 @@ logger = logging.getLogger("main")
 
 sio = socketio.AsyncClient(logger=logger)
 
-#DOWNLOAD_URL = ***REMOVED***"
-DOWNLOAD_URL = ***REMOVED***"
-#DOWNLOAD_URL = ***REMOVED***"
+#DOWNLOAD_URL = "***REMOVED***"
+DOWNLOAD_URL = "***REMOVED***"
+#DOWNLOAD_URL = "***REMOVED***"
 
 
 @sio.event
