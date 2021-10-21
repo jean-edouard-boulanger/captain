@@ -86,7 +86,7 @@ class InMemoryPersistence(PersistenceBase):
 
 class SQLitePersistence(PersistenceBase):
     def __init__(self, database_file_path: str):
-        self._conn = sqlite3.connect(database_file_path)
+        self._conn = sqlite3.connect(str(Path(database_file_path).expanduser()))
         self._conn.row_factory = SQLitePersistence._dict_factory
         self._init_db()
 
