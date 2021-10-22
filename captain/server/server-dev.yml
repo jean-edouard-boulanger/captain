@@ -13,6 +13,6 @@ download_directories:
 shutdown_timeout: 10
 persistence_type: IN_MEMORY
 logging_settings:
-  level: INFO
+  level: DEBUG
 persistence_settings:
   database_file_path: ~/.captain/db.json

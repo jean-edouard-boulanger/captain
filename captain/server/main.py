@@ -20,10 +20,12 @@ import argparse
 import threading
 import asyncio
 import socketio
+import signal
 import os
 
 sio = socketio.AsyncServer(async_mode="aiohttp", cors_allowed_origins="*")
 rpc = SocketioRpc(sio)
+app = web.Application()
 
 logger = get_logger()
 
@@ -183,6 +185,16 @@ def get_arguments_parser():
     return parser
 
 
+def signal_handler(*args, **kwargs):
+    stop_manager()
+    logger.info("download manager stopped")
+    signal.raise_signal(signal.SIGKILL)  # TODO: there is probably a better way to stop the web server gracefully
+
+
+signal.signal(signal.SIGINT, signal_handler)
+signal.signal(signal.SIGTERM, signal_handler)
+
+
 def main():
     config = get_arguments_parser().parse_args()
     with open(config.config) as cf:
@@ -196,8 +208,8 @@ def main():
     )
     start_manager()
     logger.info("download manager started")
-    app = web.Application()
     app.router.add_get("/download/{handle}", download_handler)
+    print(sio)
     sio.attach(app)
     sio.start_background_task(sio_publisher, shared_queue, sio.emit)
     logger.info("publisher started")
@@ -206,7 +218,7 @@ def main():
         host=manager_settings.listen_host,
         port=manager_settings.listen_port,
         access_log=None,
-        handle_signals=True,
+        handle_signals=False,
     )
     logger.info("stopping download manager")
     stop_manager()
