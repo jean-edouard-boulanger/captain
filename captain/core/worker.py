@@ -15,12 +15,12 @@ class Worker(threading.Thread):
         self._message_queue = message_queue or queue.Queue
 
     def consume_message(self, message: Any):
-        pass
+        raise NotImplementedError("workers must implement 'consume_message'")
 
     def run(self) -> None:
         while True:
             try:
-                message = self._message_queue.get(timeout=0.1)
+                message = self._message_queue.get()
                 if isinstance(message, self._Stop):
                     break
                 self.consume_message(message)
