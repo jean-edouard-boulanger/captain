@@ -1,3 +1,4 @@
+from .logging import get_logger
 from .download_listener import DownloadListenerBase, NoOpDownloadListener
 from .download_sink import DownloadSinkBase, NoOpDownloadSink
 from .download_entities import (
@@ -5,22 +6,23 @@ from .download_entities import (
     DownloadMetadata,
     DownloadHandle,
     DataRange,
-    ErrorInfo
+    ErrorInfo,
 )
 
-from typing import Optional, List, Protocol
+from requests.auth import HTTPBasicAuth, HTTPProxyAuth, HTTPDigestAuth
+import requests.exceptions
+import requests
+
+from typing import Optional, List, Protocol, Union, Dict, Any
 from dataclasses import dataclass
 from urllib.parse import urlparse, unquote
 from threading import Event, Thread
 from datetime import datetime, timedelta
-import requests.exceptions
-import requests
 import traceback
-import logging
 import os
 
 
-logger = logging.getLogger("task")
+logger = get_logger()
 
 
 CHUNK_SIZE = 8192
@@ -49,6 +51,26 @@ def _format_error(e: Exception):
         if response.status_code == 401:
             return "not authorized to download resource"
     return default_error
+
+
+AuthMethod = Union[HTTPBasicAuth, HTTPProxyAuth, HTTPDigestAuth]
+
+
+def _parse_auth_payload(data: Optional[Dict[str, Any]]) -> Optional[AuthMethod]:
+    if data is None:
+        return None
+    if "basic" in data:
+        data = data["basic"]
+        return HTTPBasicAuth(data["username"], data["password"])
+    if "proxy" in data:
+        data = data["proxy"]
+        return HTTPProxyAuth(data["username"], data["password"])
+    if "digest" in data:
+        data = data["digest"]
+        return HTTPDigestAuth(data["username"], data["password"])
+    raise ValueError(
+        f"'{list(data.keys())[0]}' is not a supported authentication strategy"
+    )
 
 
 @dataclass
@@ -94,18 +116,22 @@ class DownloadTaskBase(Protocol):
 
 
 class DownloadTask(object):
-    def __init__(self,
-                 handle: DownloadHandle,
-                 request: DownloadRequest,
-                 sink: Optional[DownloadSinkBase] = None,
-                 listener: Optional[DownloadListenerBase] = None,
-                 progress_report_interval: Optional[timedelta] = None):
+    def __init__(
+        self,
+        handle: DownloadHandle,
+        request: DownloadRequest,
+        sink: Optional[DownloadSinkBase] = None,
+        listener: Optional[DownloadListenerBase] = None,
+        progress_report_interval: Optional[timedelta] = None,
+    ):
         self._handle = handle
         self._request = request
         self._sink = sink or NoOpDownloadSink()
         self._listener = listener or NoOpDownloadListener()
         self._stopped_flag = Event()
-        self._progress_report_interval = progress_report_interval or timedelta(seconds=1)
+        self._progress_report_interval = progress_report_interval or timedelta(
+            seconds=1
+        )
 
     def _download_loop_impl(self, req, sink: DownloadSinkBase):
         download_iter = req.iter_content(chunk_size=CHUNK_SIZE)
@@ -126,11 +152,11 @@ class DownloadTask(object):
                     datetime.now(),
                     self._handle,
                     progress_manager.current_bytes,
-                    progress_manager.current_rate)
+                    progress_manager.current_rate,
+                )
                 progress_manager.next_slice()
             if is_complete:
-                self._listener.download_complete(
-                    datetime.now(), self._handle)
+                self._listener.download_complete(datetime.now(), self._handle)
                 return
             sink.write(next_chunk)
 
@@ -141,22 +167,28 @@ class DownloadTask(object):
         except Exception as e:
             logger.error(f"while downloading file: {e}\n{traceback.format_exc()}")
             self._listener.download_errored(
-                datetime.now(), self._handle,
-                ErrorInfo(f"Could not download '{self._request.remote_file_name}': {_format_error(e)}",
-                          traceback.format_exc()))
+                datetime.now(),
+                self._handle,
+                ErrorInfo(
+                    f"Could not download '{self._request.remote_file_name}': {_format_error(e)}",
+                    traceback.format_exc(),
+                ),
+            )
 
     def run_impl(self):
         settings = self._request
         url_meta = urlparse(settings.remote_file_url)
         remote_file_name = unquote(os.path.basename(url_meta.path))
         download_metadata = DownloadMetadata(
-            remote_file_name=remote_file_name,
-            remote_url=settings.remote_file_url)
+            remote_file_name=remote_file_name, remote_url=settings.remote_file_url
+        )
         request_settings = {"verify": False, "stream": True, "headers": {}}
-        if settings.auth:
-            request_settings["auth"] = settings.auth
+        if settings.auth_payload:
+            request_settings["auth"] = _parse_auth_payload(settings.auth_payload)
         if settings.data_range:
-            request_settings["headers"]["Range"] = _make_range_header(settings.data_range)
+            request_settings["headers"]["Range"] = _make_range_header(
+                settings.data_range
+            )
         with requests.get(settings.remote_file_url, **request_settings) as r:
             r.raise_for_status()
             headers = r.headers
@@ -165,7 +197,9 @@ class DownloadTask(object):
             download_metadata.file_size = int(raw_file_size) if raw_file_size else None
             download_metadata.file_type = headers.get("Content-Type")
             download_metadata.accept_ranges = headers.get("Accept-Ranges") == "bytes"
-            self._listener.download_started(datetime.now(), self._handle, download_metadata)
+            self._listener.download_started(
+                datetime.now(), self._handle, download_metadata
+            )
             self._download_loop(r)
 
     def run(self):
@@ -174,9 +208,13 @@ class DownloadTask(object):
         except Exception as e:
             logger.error(f"while initializing download: {e}\n{traceback.format_exc()}")
             self._listener.download_errored(
-                datetime.now(), self._handle,
-                ErrorInfo(f"Could not download '{self._request.remote_file_name}': {_format_error(e)}",
-                          traceback.format_exc()))
+                datetime.now(),
+                self._handle,
+                ErrorInfo(
+                    f"Could not download '{self._request.remote_file_name}': {_format_error(e)}",
+                    traceback.format_exc(),
+                ),
+            )
 
     def stop(self):
         logger.info(f"task {self._handle} requested to stop")

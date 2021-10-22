@@ -87,7 +87,7 @@ function App() {
       }
       if(data.event_type === "DOWNLOAD_ERRORED") {
         setNotification({
-          message: data.payload.state.error_info.message,
+          message: data.payload.error_message,
           severity: "error"
         })
       }

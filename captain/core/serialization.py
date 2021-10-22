@@ -4,6 +4,8 @@ from datetime import datetime, date
 import decimal
 import json
 
+import pydantic
+
 
 def serialize(data: Any) -> Any:
     def serialize_key(key: Any) -> Optional[Union[str, int, float, bool]]:
@@ -15,6 +17,8 @@ def serialize(data: Any) -> Any:
 
     if hasattr(data, "serialize"):
         return serialize(data.serialize())
+    if isinstance(data, pydantic.BaseModel):
+        return serialize(data.dict())
     if isinstance(data, decimal.Decimal):
         return float(data)
     if isinstance(data, (datetime, date)):
@@ -31,6 +35,7 @@ def serialize(data: Any) -> Any:
 def serializer(func):
     def impl(*args, **kwargs):
         return serialize(func(*args, **kwargs))
+
     return impl
 
 

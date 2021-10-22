@@ -1,7 +1,6 @@
 from captain.core.serialization import serializer
 
 from typing import Any, Optional, Dict, Union
-from requests.auth import HTTPBasicAuth, HTTPProxyAuth, HTTPDigestAuth
 from dateutil.parser import parse as parse_date
 from dataclasses import dataclass
 from urllib.parse import unquote
@@ -10,24 +9,6 @@ from pathlib import Path
 import enum
 import uuid
 import os
-
-
-Auth = Union[HTTPBasicAuth, HTTPProxyAuth, HTTPDigestAuth]
-
-
-def _deserialize_auth(data) -> Optional[Auth]:
-    if data is None:
-        return None
-    if "basic" in data:
-        data = data["basic"]
-        return HTTPBasicAuth(data["username"], data["password"])
-    if "proxy" in data:
-        data = data["proxy"]
-        return HTTPProxyAuth(data["username"], data["password"])
-    if "digest" in data:
-        data = data["digest"]
-        return HTTPDigestAuth(data["username"], data["password"])
-    raise ValueError(f"'{list(data.keys())[0]}' is not a supported authentication strategy")
 
 
 class DownloadHandle(object):
@@ -46,7 +27,7 @@ class DownloadHandle(object):
     def __hash__(self):
         return hash(self.handle)
 
-    def __eq__(self, other: 'DownloadHandle'):
+    def __eq__(self, other: "DownloadHandle"):
         return self.handle == other.handle
 
     @property
@@ -54,7 +35,7 @@ class DownloadHandle(object):
         return self._handle
 
     @staticmethod
-    def make() -> 'DownloadHandle':
+    def make() -> "DownloadHandle":
         return DownloadHandle(uuid.uuid4())
 
 
@@ -64,18 +45,15 @@ class DataRange:
     last_byte: Optional[int] = None
 
     def serialize(self) -> Dict:
-        return {
-            "first_byte": self.first_byte,
-            "last_byte": self.last_byte
-        }
+        return {"first_byte": self.first_byte, "last_byte": self.last_byte}
 
     @staticmethod
     def deserialize(data: Optional[Dict]) -> Optional["DataRange"]:
         if not data:
             return None
         return DataRange(
-            first_byte=data.get("first_byte"),
-            last_byte=data.get("last_byte"))
+            first_byte=data.get("first_byte"), last_byte=data.get("last_byte")
+        )
 
 
 @dataclass
@@ -84,7 +62,7 @@ class DownloadRequest:
     local_dir: Optional[Path] = None
     local_file_name: Optional[str] = None
     start_at: Optional[datetime] = None
-    auth: Optional[Auth] = None
+    auth_payload: Optional[Any] = None
     data_range: Optional[DataRange] = None
 
     @property
@@ -98,15 +76,14 @@ class DownloadRequest:
             "local_dir": self.local_dir,
             "local_file_name": self.local_file_name,
             "start_at": self.start_at,
-            "has_auth": self.auth is not None,
+            "auth_payload": self.auth_payload,
+            "has_auth": self.auth_payload is not None,
             "range": self.data_range,
-            "properties": {
-                "remote_file_name": self.remote_file_name
-            }
+            "properties": {"remote_file_name": self.remote_file_name},
         }
 
     @staticmethod
-    def deserialize(data: Optional[Dict]) -> Optional['DownloadRequest']:
+    def deserialize(data: Optional[Dict]) -> Optional["DownloadRequest"]:
         if data is None:
             return None
         return DownloadRequest(
@@ -114,8 +91,8 @@ class DownloadRequest:
             local_dir=Path(data.get("local_dir")) if data.get("local_dir") else None,
             local_file_name=data.get("local_file_name"),
             start_at=parse_date(data.get("start_at")) if data.get("start_at") else None,
-            auth=_deserialize_auth(data.get("auth")),
-            data_range=DataRange.deserialize(data.get("range"))
+            auth_payload=data.get("auth_payload"),
+            data_range=DataRange.deserialize(data.get("range")),
         )
 
 
@@ -126,18 +103,13 @@ class ErrorInfo:
 
     @serializer
     def serialize(self) -> Dict:
-        return {
-            "message": self.message,
-            "stack": self.stack
-        }
+        return {"message": self.message, "stack": self.stack}
 
     @staticmethod
-    def deserialize(data: Optional[Dict]) -> Optional['ErrorInfo']:
+    def deserialize(data: Optional[Dict]) -> Optional["ErrorInfo"]:
         if data is None:
             return None
-        return ErrorInfo(
-            message=data["message"],
-            stack=data["stack"])
+        return ErrorInfo(message=data["message"], stack=data["stack"])
 
 
 class DownloadStatus(enum.Enum):
@@ -165,7 +137,7 @@ class DownloadMetadata:
             "remote_file_name": self.remote_file_name,
             "file_size": self.file_size,
             "file_type": self.file_type,
-            "accept_ranges": self.accept_ranges
+            "accept_ranges": self.accept_ranges,
         }
 
     @staticmethod
@@ -177,7 +149,8 @@ class DownloadMetadata:
             remote_file_name=data["remote_file_name"],
             file_size=int(data["file_size"]),
             file_type=data["file_type"],
-            accept_ranges=data["accept_ranges"])
+            accept_ranges=data["accept_ranges"],
+        )
 
 
 @dataclass
@@ -199,7 +172,7 @@ class DownloadState:
         return self.status in {
             DownloadStatus.STOPPED,
             DownloadStatus.ERROR,
-            DownloadStatus.COMPLETE
+            DownloadStatus.COMPLETE,
         }
 
     @property
@@ -208,22 +181,29 @@ class DownloadState:
 
     @property
     def can_be_resumed(self) -> bool:
-        return (self.status == DownloadStatus.PAUSED
-                and self.requested_status is None
-                and self.metadata is not None
-                and self.metadata.file_size is not None)
+        return (
+            self.status == DownloadStatus.PAUSED
+            and self.requested_status is None
+            and self.metadata is not None
+            and self.metadata.file_size is not None
+        )
 
     @property
     def can_be_paused(self) -> bool:
-        return (self.status == DownloadStatus.ACTIVE
-                and self.requested_status is None
-                and self.metadata is not None
-                and self.metadata.accept_ranges)
+        return (
+            self.status == DownloadStatus.ACTIVE
+            and self.requested_status is None
+            and self.metadata is not None
+            and self.metadata.accept_ranges
+        )
 
     @property
     def can_be_stopped(self) -> bool:
-        return (self.status in {DownloadStatus.ACTIVE, DownloadStatus.PAUSED, DownloadStatus.SCHEDULED}
-                and self.requested_status is None)
+        return (
+            self.status
+            in {DownloadStatus.ACTIVE, DownloadStatus.PAUSED, DownloadStatus.SCHEDULED}
+            and self.requested_status is None
+        )
 
     @property
     def can_be_retried(self) -> bool:
@@ -255,8 +235,8 @@ class DownloadState:
                 "can_be_stopped": self.can_be_stopped,
                 "can_be_retried": self.can_be_retried,
                 "can_be_rescheduled": self.can_be_rescheduled,
-                "can_be_downloaded": self.can_be_downloaded
-            }
+                "can_be_downloaded": self.can_be_downloaded,
+            },
         }
 
     @staticmethod
@@ -271,7 +251,7 @@ class DownloadState:
             status=DownloadStatus[data["status"]],
             start_time=parse_date(data["start_time"]) if data["start_time"] else None,
             end_time=parse_date(data["end_time"]) if data["end_time"] else None,
-            error_info=ErrorInfo.deserialize(data["error_info"])
+            error_info=ErrorInfo.deserialize(data["error_info"]),
         )
 
 
@@ -288,7 +268,7 @@ class DownloadEntry:
             "handle": str(self.handle),
             "user_request": self.user_request,
             "system_request": self.system_request,
-            "state": self.state
+            "state": self.state,
         }
 
     @staticmethod
@@ -299,4 +279,5 @@ class DownloadEntry:
             handle=DownloadHandle(data["handle"]),
             user_request=DownloadRequest.deserialize(data["user_request"]),
             system_request=DownloadRequest.deserialize(data["system_request"]),
-            state=DownloadState.deserialize(data["state"]))
+            state=DownloadState.deserialize(data["state"]),
+        )

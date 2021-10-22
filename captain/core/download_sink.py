@@ -7,7 +7,7 @@ class DownloadSinkBase(Protocol):
     def write(self, data: bytes):
         pass
 
-    def __enter__(self) -> 'DownloadSinkBase':
+    def __enter__(self) -> "DownloadSinkBase":
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):

@@ -1,10 +1,11 @@
+from .logging import get_logger
+
 from typing import Optional, Dict
 from socketio import AsyncServer
 import functools
-import logging
 
 
-logger = logging.getLogger("socketio_rpc")
+logger = get_logger()
 
 
 class SocketioRpc(object):
@@ -13,12 +14,13 @@ class SocketioRpc(object):
         self._server.on("rpc_request")(self._handle_rpc_request)
         self._handlers = {}
 
-    async def _send_rpc_response(self, message_id: str, response: Optional[Dict] = None, error: Optional[str] = None):
-        payload = {
-            "message_id": message_id,
-            "response": response,
-            "error": error
-        }
+    async def _send_rpc_response(
+        self,
+        message_id: str,
+        response: Optional[Dict] = None,
+        error: Optional[str] = None,
+    ):
+        payload = {"message_id": message_id, "response": response, "error": error}
         logger.debug(f"sending rpc response: {payload}")
         await self._server.emit("rpc_response", payload)
 
@@ -42,6 +44,8 @@ class SocketioRpc(object):
             @functools.wraps(func)
             def impl(message_id, request):
                 return func(message_id, request)
+
             self._handlers[request_type] = impl
             return impl
+
         return decorator

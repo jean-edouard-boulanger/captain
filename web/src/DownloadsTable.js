@@ -26,7 +26,7 @@ import ScheduleDialog from "./ScheduleDialog";
 import {format as format_date} from 'date-fns';
 
 
-function convertBytes(bps)
+function formatBytes(bps)
 {
   if(bps >= 1000000) { return [(bps / 1000000).toFixed(1), "MB"] }
   if(bps >= 1000) { return [(bps / 1000).toFixed(1), "KB"] }
@@ -34,14 +34,13 @@ function convertBytes(bps)
 }
 
 
-function defaultMetadata()
-{
-  return {
-    remote_file_name: null,
-    remote_url: null,
-    file_size: null,
-    file_type: null,
-  };
+const ACTIONS = {
+  Resume: "r",
+  Pause: "p",
+  Stop: "S",
+  Retry: "rt",
+  Reschedule: "rs",
+  Download: "d"
 }
 
 
@@ -51,7 +50,7 @@ const ACTION_MENU = {
       items: [
         {
           text: 'Pause',
-          visible: ({state}) => state.properties.can_be_paused,
+          visible: ({valid_actions}) => valid_actions.includes(ACTIONS.Pause),
           onClick: ({controller, handle}) => {
             controller.pauseDownload(handle);
           },
@@ -59,7 +58,7 @@ const ACTION_MENU = {
         },
         {
           text: 'Resume',
-          visible: ({state}) => state.properties.can_be_resumed,
+          visible: ({valid_actions}) => valid_actions.includes(ACTIONS.Resume),
           onClick: ({controller, handle}) => {
             controller.resumeDownload(handle);
           },
@@ -67,7 +66,7 @@ const ACTION_MENU = {
         },
         {
           text: 'Stop',
-          visible: ({state}) => state.properties.can_be_stopped,
+          visible: ({valid_actions}) => valid_actions.includes(ACTIONS.Stop),
           onClick: ({controller, handle}) => {
             controller.stopDownload(handle);
           },
@@ -75,7 +74,7 @@ const ACTION_MENU = {
         },
         {
           text: 'Retry',
-          visible: ({state}) => state.properties.can_be_retried,
+          visible: ({valid_actions}) => valid_actions.includes(ACTIONS.Retry),
           onClick: ({controller, handle}) => {
             controller.retryDownload(handle);
           },
@@ -83,7 +82,7 @@ const ACTION_MENU = {
         },
         {
           text: 'Start now',
-          visible: ({state}) => state.properties.can_be_rescheduled,
+          visible: ({valid_actions}) => valid_actions.includes(ACTIONS.Reschedule),
           onClick: ({controller, handle}) => {
             controller.rescheduleDownload(handle, new Date());
           },
@@ -91,7 +90,7 @@ const ACTION_MENU = {
         },
         {
           text: 'Reschedule',
-          visible: ({state}) => state.properties.can_be_rescheduled,
+          visible: ({valid_actions}) => valid_actions.includes(ACTIONS.Reschedule),
           onClick: ({controller, handle}) => {
             controller.rescheduleDownload(handle, new Date());
           },
@@ -103,7 +102,7 @@ const ACTION_MENU = {
       items: [
         {
           text: 'Download',
-          visible: ({state}) => state.properties.can_be_downloaded,
+          visible: ({valid_actions}) => valid_actions.includes(ACTIONS.Download),
           onClick: ({controller, handle}) => {
             const anchor = document.createElement('a');
             anchor.href = controller.getDownloadedFileUrl(handle);
@@ -117,7 +116,7 @@ const ACTION_MENU = {
       items: [
         {
           text: 'Remove',
-          visible: ({state}) => state.properties.is_final,
+          visible: ({is_final}) => is_final,
           onClick: ({controller, handle}) => {
             controller.removeDownload({handle, deleteFile: false});
           },
@@ -125,10 +124,7 @@ const ACTION_MENU = {
         },
         {
           text: 'Remove with data',
-          visible: ({state}) => {
-            return state.properties.is_final
-              && state.file_location !== null;
-          },
+          visible: ({is_final, valid_actions}) => is_final && valid_actions.includes(ACTIONS.Download),
           onClick: ({controller, handle}) => {
             controller.removeDownload({handle, deleteFile: true});
           },
@@ -140,12 +136,10 @@ const ACTION_MENU = {
 }
 
 function getActionMenuSections({ entry, controller }) {
-  const handle = entry.handle;
-  const state = entry.state;
   const sections = []
   ACTION_MENU.sections.forEach((section) => {
     const items = section.items.filter((item) => {
-      return item.visible({ state });
+      return item.visible(entry);
     });
     if(items.length > 0) {
       sections.push(items);
@@ -188,30 +182,26 @@ export function DownloadsTable(props) {
           downloads.map(entry => {
             const payload = entry.payload;
             const handle = payload.handle;
-            const state = payload.state;
-            const metadata = state.metadata ?? defaultMetadata();
-            const progress = (metadata.file_size === null)
-              ? null
-              : state.downloaded_bytes / metadata.file_size;
+            const downloadStatus = payload.status;
             return (
               <TableRow key={payload.handle}>
-                <TableCell>{payload.user_request.properties.remote_file_name}</TableCell>
+                <TableCell>{payload.file_name}</TableCell>
                 <TableCell>
-                  {(state.status === "SCHEDULED" && payload.user_request.start_at !== null) &&
-                    `Will start on ${format_date(new Date(payload.user_request.start_at), 'MM/dd/yyyy hh:mm a')}`
+                  {(downloadStatus === "SCHEDULED" && payload.start_time !== null) &&
+                    `Will start on ${format_date(new Date(payload.start_time), 'MM/dd/yyyy hh:mm a')}`
                   }
-                  {(progress !== null) &&
+                  {(payload.progress !== null) &&
                     <LinearProgress variant="determinate"
-                                    value={progress * 100} />
+                                    value={payload.progress_pc * 100} />
                   }
                 </TableCell>
                 <TableCell style={{minWidth: 50, maxWidth: 50}}>
-                  {(state.status === "ACTIVE") &&
-                    (state.current_rate !== null) && `${convertBytes(state.current_rate).join(" ")}/s`
+                  {(downloadStatus === "ACTIVE") &&
+                    (payload.current_rate !== null) && `${formatBytes(payload.current_rate).join(" ")}/s`
                   }
                 </TableCell>
                 <TableCell>
-                  <Chip variant="outlined" label={state.status} color={state.status === 'ERROR' ? 'secondary' : ''} />
+                  <Chip variant="outlined" label={downloadStatus} color={downloadStatus === 'ERROR' ? 'secondary' : ''} />
                 </TableCell>
                 <TableCell>
                   <IconButton aria-label='actions'

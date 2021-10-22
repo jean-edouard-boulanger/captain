@@ -3,7 +3,7 @@ from .download_manager import (
     DownloadManagerSettings,
     DownloadManagerObserverBase,
     DownloadManagerEvent,
-    EventType
+    EventType,
 )
 from .download_entities import (
     ErrorInfo,
@@ -11,7 +11,6 @@ from .download_entities import (
     DownloadMetadata,
     DownloadState,
     DownloadRequest,
-    DownloadHandle
+    DownloadHandle,
 )
 from .socketio_rpc import SocketioRpc
-

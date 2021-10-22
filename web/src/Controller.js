@@ -94,7 +94,7 @@ export function makeController({endpoint, socket}) {
         local_dir: download.localDir,
         local_file_name: download.renameTo,
         start_at: makeStartAt(),
-        auth: makeAuth()
+        auth_payload: makeAuth()
       });
     },
     validateDirectory: (directory) => {

@@ -12,5 +12,7 @@ download_directories:
     label: Documents
 shutdown_timeout: 10
 persistence_type: IN_MEMORY
+logging_settings:
+  level: INFO
 persistence_settings:
-  persist_file_path: ~/.captain/db.json
+  database_file_path: ~/.captain/db.json

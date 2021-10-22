@@ -1,16 +1,19 @@
+from .logging import get_logger
 from .download_entities import DownloadHandle, DownloadEntry
+
+import orjson
+
+import sqlite3
 
 from typing import Protocol, Dict, List, Optional, ContextManager
 from contextlib import contextmanager
 from pathlib import Path
 import enum
 import json
-import logging
 import traceback
-import sqlite3
 
 
-logger = logging.getLogger("persistence")
+logger = get_logger()
 
 
 class PersistenceBase(Protocol):
@@ -40,10 +43,10 @@ class PersistenceBase(Protocol):
 
 
 class InMemoryPersistence(PersistenceBase):
-    def __init__(self, persist_file_path: Optional[str] = None):
+    def __init__(self, database_file_path: Optional[str] = None):
         self._db: Dict[DownloadHandle, DownloadEntry] = dict()
         self._persist_file_path = (
-            Path(persist_file_path).expanduser() if persist_file_path else None
+            Path(database_file_path).expanduser() if database_file_path else None
         )
         if self._persist_file_path and self._persist_file_path.is_file():
             try:
@@ -87,8 +90,7 @@ class InMemoryPersistence(PersistenceBase):
 class SQLitePersistence(PersistenceBase):
     def __init__(self, database_file_path: str):
         self._conn = sqlite3.connect(
-            str(Path(database_file_path).expanduser()),
-            check_same_thread=False
+            str(Path(database_file_path).expanduser()), check_same_thread=False
         )
         self._conn.row_factory = SQLitePersistence._dict_factory
         self._init_db()
@@ -115,12 +117,14 @@ class SQLitePersistence(PersistenceBase):
             {"handle": str(handle)},
         )
         row = cursor.fetchone()
-        return DownloadEntry.deserialize(json.loads(row["payload"]))
+        return DownloadEntry.deserialize(orjson.loads(row["payload"]))
 
     def get_all_entries(self) -> List[DownloadEntry]:
         cursor = self._cursor()
         cursor.execute("SELECT payload FROM download_entries")
-        return [DownloadEntry.deserialize(json.loads(row["payload"])) for row in cursor]
+        return [
+            DownloadEntry.deserialize(orjson.loads(row["payload"])) for row in cursor
+        ]
 
     def remove_entry(self, handle) -> None:
         cursor = self._cursor()
@@ -140,7 +144,7 @@ class SQLitePersistence(PersistenceBase):
             VALUES (:handle, :payload)
             ON CONFLICT(handle) DO UPDATE SET payload = excluded.payload;
         """,
-            {"handle": str(entry.handle), "payload": json.dumps(entry.serialize())},
+            {"handle": str(entry.handle), "payload": orjson.dumps(entry.serialize())},
         )
 
     def flush(self):
