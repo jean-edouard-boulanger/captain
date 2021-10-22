@@ -2,10 +2,8 @@ from .serialization import serialize
 from .logging import get_logger
 from .client_view import DownloadEntry as ExternalDownloadEntry
 from .download_persistence import get_persistence, PersistenceType
-from .download_task import ThreadedDownloadTask
-from .download_sink import FileDownloadSink
-from .download_task import DownloadTask
-from .download_listener import DownloadListenerBase
+from .download_listener import DownloadListenerBase, ThreadedDownloadListenerBridge
+from .download_process import DownloadProcess, create_download_process
 from .scheduler import Scheduler, ThreadedScheduler
 from .download_entities import (
     DownloadState,
@@ -218,11 +216,12 @@ class DownloadManager(DownloadListenerBase):
         self._db = get_persistence(
             settings.persistence_type, **settings.persistence_settings
         )
-        self._tasks: Dict[DownloadHandle, ThreadedDownloadTask] = dict()
+        self._tasks: Dict[DownloadHandle, DownloadProcess] = dict()
         self._requests = Queue()
         self._stop_flag = threading.Event()
         self._observers: List[DownloadManagerObserverBase] = []
         self._scheduler = ThreadedScheduler(Scheduler())
+        self._listener_bridge = ThreadedDownloadListenerBridge(self)
         for entry in self._db.get_all_entries():
             if (
                 entry.user_request.start_at is not None
@@ -398,9 +397,12 @@ class DownloadManager(DownloadListenerBase):
             entry.state.status = DownloadStatus.PENDING
             tmp_file_path = system_request.local_dir / system_request.local_file_name
             invariant(not tmp_file_path.exists())
-            sink = FileDownloadSink(tmp_file_path, open_mode="wb")
-            download_task = DownloadTask(handle, system_request, sink, listener=self)
-            self._tasks[handle] = ThreadedDownloadTask(download_task)
+            self._tasks[handle] = create_download_process(
+                handle=handle,
+                request=system_request,
+                download_file_path=tmp_file_path,
+                listener=self._listener_bridge.make_listener(),
+            )
             self._tasks[handle].start()
             return handle
 
@@ -420,10 +422,12 @@ class DownloadManager(DownloadListenerBase):
                 )
             system_request = entry.system_request
             tmp_file_path = system_request.local_dir / system_request.local_file_name
-            sink = FileDownloadSink(tmp_file_path, open_mode="wb")
             invariant(handle not in self._tasks)
-            self._tasks[handle] = ThreadedDownloadTask(
-                DownloadTask(handle, system_request, sink, listener=self)
+            self._tasks[handle] = create_download_process(
+                handle=handle,
+                request=system_request,
+                download_file_path=tmp_file_path,
+                listener=self._listener_bridge.make_listener(),
             )
             self._tasks[handle].start()
 
@@ -471,11 +475,14 @@ class DownloadManager(DownloadListenerBase):
             tmp_file_path = system_request.local_dir / system_request.local_file_name
             invariant(tmp_file_path.is_file())
             entry.state.downloaded_bytes = tmp_file_path.stat().st_size
-            sink = FileDownloadSink(tmp_file_path, open_mode="ab")
             system_request.data_range = DataRange(entry.state.downloaded_bytes)
             invariant(handle not in self._tasks)
-            download_task = DownloadTask(handle, system_request, sink, listener=self)
-            self._tasks[handle] = ThreadedDownloadTask(download_task)
+            self._tasks[handle] = create_download_process(
+                handle=handle,
+                request=system_request,
+                download_file_path=tmp_file_path,
+                listener=self._listener_bridge.make_listener(),
+            )
             self._tasks[handle].start()
             logger.info(
                 f"resuming task {handle} from byte {entry.state.downloaded_bytes}"
@@ -707,6 +714,7 @@ class DownloadManager(DownloadListenerBase):
             )
 
     def _request_loop(self):
+        logger.debug("entering request loop")
         shutdown_at: Optional[datetime] = None
         while True:
             if self._stop_flag.is_set() and shutdown_at is None:
@@ -758,7 +766,11 @@ class DownloadManager(DownloadListenerBase):
     def run(self):
         logger.info("download manager requested to run")
         self._scheduler.start()
+        self._listener_bridge.start()
         self._request_loop()
+        logger.info("stopping download listener bridge")
+        self._listener_bridge.stop()
+        self._listener_bridge.join()
         logger.info("stopping internal scheduler")
         self._scheduler.stop()
         self._scheduler.join()

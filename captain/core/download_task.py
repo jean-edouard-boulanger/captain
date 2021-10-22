@@ -1,6 +1,5 @@
 from .logging import get_logger
 from .download_listener import DownloadListenerBase, NoOpDownloadListener
-from .download_sink import DownloadSinkBase, NoOpDownloadSink
 from .download_entities import (
     DownloadRequest,
     DownloadMetadata,
@@ -13,11 +12,12 @@ from requests.auth import HTTPBasicAuth, HTTPProxyAuth, HTTPDigestAuth
 import requests.exceptions
 import requests
 
-from typing import Optional, List, Protocol, Union, Dict, Any
+from typing import Optional, List, Protocol, Union, Dict, Any, BinaryIO
 from dataclasses import dataclass
 from urllib.parse import urlparse, unquote
 from threading import Event, Thread
 from datetime import datetime, timedelta
+from pathlib import Path
 import traceback
 import os
 
@@ -120,21 +120,23 @@ class DownloadTask(object):
         self,
         handle: DownloadHandle,
         request: DownloadRequest,
-        sink: Optional[DownloadSinkBase] = None,
+        download_file_path: Path,
         listener: Optional[DownloadListenerBase] = None,
         progress_report_interval: Optional[timedelta] = None,
     ):
         self._handle = handle
         self._request = request
-        self._sink = sink or NoOpDownloadSink()
+        self._download_file_path = download_file_path
         self._listener = listener or NoOpDownloadListener()
         self._stopped_flag = Event()
         self._progress_report_interval = progress_report_interval or timedelta(
             seconds=1
         )
 
-    def _download_loop_impl(self, req, sink: DownloadSinkBase):
-        download_iter = req.iter_content(chunk_size=CHUNK_SIZE)
+    def _download_loop_impl(
+        self, request: requests.Response, download_buffer: BinaryIO
+    ):
+        download_iter = request.iter_content(chunk_size=CHUNK_SIZE)
         progress_manager = ProgressManager()
         progress_manager.next_slice()
         next_report_cutoff = datetime.now() + self._progress_report_interval
@@ -158,12 +160,12 @@ class DownloadTask(object):
             if is_complete:
                 self._listener.download_complete(datetime.now(), self._handle)
                 return
-            sink.write(next_chunk)
+            download_buffer.write(next_chunk)
 
-    def _download_loop(self, req):
+    def _download_loop(self, response: requests.Response) -> None:
         try:
-            with self._sink as sink:
-                self._download_loop_impl(req, sink)
+            with self._download_file_path.open("ab") as f:
+                self._download_loop_impl(response, f)
         except Exception as e:
             logger.error(f"while downloading file: {e}\n{traceback.format_exc()}")
             self._listener.download_errored(
@@ -189,9 +191,9 @@ class DownloadTask(object):
             request_settings["headers"]["Range"] = _make_range_header(
                 settings.data_range
             )
-        with requests.get(settings.remote_file_url, **request_settings) as r:
-            r.raise_for_status()
-            headers = r.headers
+        with requests.get(settings.remote_file_url, **request_settings) as response:
+            response.raise_for_status()
+            headers = response.headers
             logger.debug(f"received headers: {headers}")
             raw_file_size = headers.get("Content-Length")
             download_metadata.file_size = int(raw_file_size) if raw_file_size else None
@@ -200,7 +202,7 @@ class DownloadTask(object):
             self._listener.download_started(
                 datetime.now(), self._handle, download_metadata
             )
-            self._download_loop(r)
+            self._download_loop(response)
 
     def run(self):
         try:
