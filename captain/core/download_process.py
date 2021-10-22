@@ -3,6 +3,7 @@ from datetime import timedelta
 from pathlib import Path
 import multiprocessing
 import threading
+import signal
 
 from .download_listener import MessageBasedDownloadListener
 from .download_entities import DownloadHandle, DownloadRequest
@@ -33,6 +34,7 @@ def _download_process_entrypoint(
     listener: MessageBasedDownloadListener,
     progress_report_interval: Optional[timedelta],
 ):
+    signal.signal(signal.SIGINT, signal.SIG_IGN)
     download_task = DownloadTask(
         handle=handle,
         request=request,
@@ -81,6 +83,7 @@ def create_download_process(
         message_queue=message_queue,
         download_process=multiprocessing.Process(
             target=_download_process_entrypoint,
+            daemon=True,
             args=(
                 message_queue,
                 handle,
