@@ -7,9 +7,6 @@ import threading
 from .download_listener import MessageBasedDownloadListener
 from .download_entities import DownloadHandle, DownloadRequest
 from .download_task import DownloadTaskBase, DownloadTask
-from .logging import get_logger
-
-logger = get_logger()
 
 
 class _InternalDownloadThread(threading.Thread):
