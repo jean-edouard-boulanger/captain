@@ -61,7 +61,7 @@ class DownloadEntry(BaseModel):
     def from_internal(entry: InternalDownloadEntry) -> "DownloadEntry":
         return DownloadEntry(
             handle=str(entry.handle),
-            file_name=entry.user_request.remote_file_name,
+            file_name=_get_remote_file_name(entry),
             status=entry.state.status.name,
             is_final=entry.state.is_final,
             progress_pc=_get_download_progress_pc(entry.state),

@@ -252,7 +252,7 @@ class YoutubeDownloadTask(object):
         status = progress["status"]
         if status == "downloading":
             if not self._metadata_sent:
-                self._youtube_dl_file_name: Optional[str] = progress["filename"]
+                self._youtube_dl_file_name = progress["filename"]
                 self._listener.download_started(
                     update_time=datetime.now(),
                     handle=self._handle,
