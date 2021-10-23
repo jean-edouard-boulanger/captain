@@ -188,7 +188,9 @@ def get_arguments_parser():
 def signal_handler(*args, **kwargs):
     stop_manager()
     logger.info("download manager stopped")
-    signal.raise_signal(signal.SIGKILL)  # TODO: there is probably a better way to stop the web server gracefully
+    signal.raise_signal(
+        signal.SIGKILL
+    )  # TODO: there is probably a better way to stop the web server gracefully
 
 
 signal.signal(signal.SIGINT, signal_handler)
