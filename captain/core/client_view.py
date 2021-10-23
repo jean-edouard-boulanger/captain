@@ -40,6 +40,12 @@ def _get_error_message(state: InternalDownloadState) -> Optional[str]:
     return None if not state.error_info else state.error_info.message
 
 
+def _get_remote_file_name(entry: InternalDownloadEntry) -> str:
+    if not entry.state.metadata or not entry.state.metadata.remote_file_name:
+        return entry.user_request.remote_file_name
+    return entry.state.metadata.remote_file_name
+
+
 class DownloadEntry(BaseModel):
     handle: str
     file_name: str
