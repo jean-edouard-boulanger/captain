@@ -1,4 +1,5 @@
-from captain.core.logging import configure_logging, get_logger
+from captain.core.serialization import serialize
+from captain.core.logging import get_logger
 from captain.core import (
     DownloadManager,
     DownloadManagerSettings,
@@ -9,23 +10,33 @@ from captain.core import (
     SocketioRpc,
 )
 
+import yaml
+import socketio
+
 from dateutil.parser import parse as parse_date
 from pathlib import Path
 from typing import Callable
 from asyncio import Queue
 from aiohttp import web
 import aiohttp
-import yaml
+import logging
 import argparse
 import threading
 import asyncio
-import socketio
 import signal
+import sys
 import os
+
 
 sio = socketio.AsyncServer(async_mode="aiohttp", cors_allowed_origins="*")
 rpc = SocketioRpc(sio)
 app = web.Application()
+
+logging.basicConfig(
+    stream=sys.stdout,
+    level=logging.INFO,
+    format="%(asctime)s (%(threadName)s) [%(levelname)s] %(message)s (%(filename)s:%(lineno)d)",
+)
 
 logger = get_logger()
 
@@ -79,13 +90,13 @@ async def sio_publisher(shared_queue: Queue, emit: Callable):
 
 def build_recap(manager: DownloadManager):
     downloads = manager.get_downloads(blocking=True)
-    return {"downloads": downloads, "settings": manager.settings.serialize()}
+    return {"downloads": downloads, "settings": serialize(manager.settings)}
 
 
 @sio.on("start_download")
 async def on_start_download(_, data):
     logger.info(f"start download: {data}")
-    download_request = DownloadRequest.deserialize(data)
+    download_request = DownloadRequest.parse_obj(data)
     get_manager().start_download(download_request)
 
 
@@ -93,35 +104,36 @@ async def on_start_download(_, data):
 async def on_start_download(_, data):
     logger.info(f"reschedule download: {data}")
     get_manager().reschedule_download(
-        handle=DownloadHandle(data["handle"]), start_at=parse_date(data["start_at"])
+        handle=DownloadHandle(handle=data["handle"]),
+        start_at=parse_date(data["start_at"]),
     )
 
 
 @sio.on("pause_download")
 async def on_start_download(_, data):
     logger.info(f"pause download: {data}")
-    handle = DownloadHandle(data["handle"])
+    handle = DownloadHandle(handle=data["handle"])
     get_manager().pause_download(handle)
 
 
 @sio.on("resume_download")
 async def on_start_download(_, data):
     logger.info(f"resume download: {data}")
-    handle = DownloadHandle(data["handle"])
+    handle = DownloadHandle(handle=data["handle"])
     get_manager().resume_download(handle)
 
 
 @sio.on("stop_download")
 async def on_start_download(_, data):
     logger.info(f"stop download: {data}")
-    handle = DownloadHandle(data["handle"])
+    handle = DownloadHandle(handle=data["handle"])
     get_manager().stop_download(handle)
 
 
 @sio.on("retry_download")
 async def on_start_download(_, data):
     logger.info(f"retry download: {data}")
-    handle = DownloadHandle(data["handle"])
+    handle = DownloadHandle(handle=data["handle"])
     get_manager().retry_download(handle)
 
 
@@ -130,7 +142,7 @@ async def on_start_download(_, data):
     logger.info(f"remove download: {data}")
     manager = get_manager()
     manager.remove_download(
-        handle=DownloadHandle(data["handle"]),
+        handle=DownloadHandle(handle=data["handle"]),
         delete_file=data.get("delete_file", False),
         blocking=True,
     )
@@ -163,7 +175,7 @@ async def file_sender(writer, file_path=None):
 
 
 async def download_handler(request):
-    handle = DownloadHandle(request.match_info["handle"])
+    handle = DownloadHandle(handle=request.match_info["handle"])
     entry = get_manager().get_download(handle=handle, blocking=True)
     download_status = entry["state"]["status"]
     logger.info(entry["state"])
@@ -200,9 +212,9 @@ signal.signal(signal.SIGTERM, signal_handler)
 def main():
     config = get_arguments_parser().parse_args()
     with open(config.config) as cf:
-        manager_settings = DownloadManagerSettings.deserialize(yaml.safe_load(cf))
+        manager_settings = DownloadManagerSettings.parse_obj(yaml.safe_load(cf))
     logging_settings = manager_settings.logging_settings
-    configure_logging(logging_settings.format, logging_settings.level)
+    # configure_logging(logging_settings.format, logging_settings.level)
     shared_queue = Queue()
     manager = init_manager(manager_settings)
     manager.add_observer(
@@ -211,7 +223,6 @@ def main():
     start_manager()
     logger.info("download manager started")
     app.router.add_get("/download/{handle}", download_handler)
-    print(sio)
     sio.attach(app)
     sio.start_background_task(sio_publisher, shared_queue, sio.emit)
     logger.info("publisher started")

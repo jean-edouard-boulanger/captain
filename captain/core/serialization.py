@@ -1,6 +1,6 @@
 from typing import Any, Optional, Union
 from pathlib import PurePath
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
 import decimal
 import json
 
@@ -23,6 +23,8 @@ def serialize(data: Any) -> Any:
         return float(data)
     if isinstance(data, (datetime, date)):
         return data.isoformat()
+    if isinstance(data, timedelta):
+        return data.total_seconds()
     if isinstance(data, dict):
         return {serialize_key(k): serialize(v) for k, v in data.items()}
     if isinstance(data, (list, set, tuple)):
