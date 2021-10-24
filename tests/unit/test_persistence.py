@@ -7,12 +7,9 @@ from captain.core.domain import (
     DownloadState,
     DownloadEntry,
 )
-from captain.core.persistence import (
-    InMemoryPersistence,
-    SQLitePersistence,
-    PersistenceType,
-    get_persistence,
-)
+from captain.core.persistence_sqlite import SQLitePersistence
+from captain.core.persistence_in_memory import InMemoryPersistence
+from captain.core.persistence_factory import get_persistence
 from captain.core.serialization import pretty_dump
 
 
@@ -26,14 +23,14 @@ def create_dummy_download_entry() -> DownloadEntry:
 
 
 @pytest.mark.parametrize(
-    "persistence_type,impl_type,kwargs",
+    "persistence_settings,impl_type",
     [
-        (PersistenceType.IN_MEMORY, InMemoryPersistence, {}),
-        (PersistenceType.SQLITE, SQLitePersistence, {"database_file_path": ":memory:"}),
+        (InMemoryPersistence.Settings(), InMemoryPersistence),
+        (SQLitePersistence.Settings(database_file_path=":memory:"), SQLitePersistence),
     ],
 )
-def test_persistence(persistence_type, impl_type, kwargs):
-    persistence = get_persistence(persistence_type, **kwargs)
+def test_persistence(persistence_settings, impl_type):
+    persistence = get_persistence(persistence_settings)
     assert isinstance(persistence, impl_type)
     entry1 = create_dummy_download_entry()
     assert not persistence.has_entry(entry1.handle)

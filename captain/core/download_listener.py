@@ -1,4 +1,5 @@
 from .logging import get_logger
+from .serialization import serialize
 from .domain import DownloadMetadata, ErrorInfo, DownloadHandle
 from .worker import Worker
 
@@ -40,7 +41,7 @@ class NoOpDownloadListener(DownloadListenerBase):
     def download_started(
         self, update_time: datetime, handle: DownloadHandle, metadata: DownloadMetadata
     ):
-        logger.debug(f"download started [{handle}]: {metadata.serialize()}")
+        logger.debug(f"download started [{handle}]: {serialize(metadata)}")
 
     def download_stopped(self, update_time: datetime, handle: DownloadHandle):
         logger.debug(f"download stopped [{handle}]")

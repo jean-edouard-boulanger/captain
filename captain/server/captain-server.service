@@ -8,7 +8,7 @@ Type=simple
 Restart=always
 RestartSec=1
 User=captain
-ExecStart=/usr/local/bin/python3.8 -m captain.server.main -c /etc/captain/config.yml
+ExecStart=/usr/local/bin/python3.9 -m captain.server.main -c /etc/captain/config.yml
 
 [Install]
 WantedBy=multi-user.target

@@ -1,10 +1,29 @@
+from typing import Dict, Any, Optional, Callable, Tuple, List, Union, Protocol
+from datetime import datetime, timedelta
+from functools import partial, wraps
+from contextlib import contextmanager
+from dataclasses import dataclass
+from pathlib import Path
+from queue import Queue
+import threading
+import traceback
+import shutil
+import queue
+import uuid
+import os
+
+from send2trash import send2trash
+import pytz
+
 from .serialization import serialize
 from .logging import get_logger
 from .client_view import DownloadEntry as ExternalDownloadEntry
-from .persistence import get_persistence, PersistenceType
+from .persistence_factory import get_persistence
+from .download_manager_settings import DownloadManagerSettings
 from .download_listener import DownloadListenerBase, ThreadedDownloadListenerBridge
 from .download_process import DownloadProcessWrapper, create_download_process
 from .scheduler import Scheduler, ThreadedScheduler
+from .errors import CaptainError
 from .domain import (
     DownloadState,
     DownloadStatus,
@@ -14,117 +33,20 @@ from .domain import (
     DownloadHandle,
     ErrorInfo,
     DataRange,
+    NotificationSeverity,
+    GeneralNotification,
+    EventType,
+    DownloadManagerEvent,
 )
 from .invariant import invariant, required_value
 from .future import Future
 
-from send2trash import send2trash
-
-from typing import Dict, Any, Optional, Callable, Tuple, List, Union, Protocol
-from datetime import datetime, timedelta
-from functools import partial, wraps
-from contextlib import contextmanager
-from dataclasses import dataclass
-from pathlib import Path
-from queue import Queue
-import traceback
-import shutil
-import queue
-import enum
-import threading
-import uuid
-import pytz
-import os
 
 logger = get_logger()
 
 
-DEFAULT_LOGGING_FORMAT = (
-    "%(asctime)s (%(threadName)s) [%(levelname)s] %(message)s (%(filename)s:%(lineno)d)"
-)
-
-
 def _make_error_reference_code() -> str:
     return f"{uuid.uuid4()}"
-
-
-@dataclass
-class LoggingSettings:
-    level: str
-    format: str
-
-    def serialize(self):
-        return {"level": self.level, "format": self.format}
-
-    @staticmethod
-    def deserialize(data: Optional[Dict[str, Any]]) -> Optional["LoggingSettings"]:
-        if data is None:
-            return None
-        return LoggingSettings(
-            level=data.get("level", "INFO"),
-            format=data.get("format", DEFAULT_LOGGING_FORMAT),
-        )
-
-
-@dataclass
-class DownloadDirectory:
-    directory: Path
-    label: str
-
-    def serialize(self):
-        return {"directory": str(self.directory), "label": self.label}
-
-    @staticmethod
-    def deserialize(data: Optional[Dict[str, Any]]) -> Optional["DownloadDirectory"]:
-        if data is None:
-            return None
-        return DownloadDirectory(
-            directory=Path(data["directory"]).expanduser(), label=data["label"]
-        )
-
-
-@dataclass
-class DownloadManagerSettings:
-    listen_host: str
-    listen_port: int
-    temp_download_dir: Path
-    download_directories: List[DownloadDirectory]
-    shutdown_timeout: timedelta
-    persistence_type: PersistenceType
-    logging_settings: LoggingSettings
-    persistence_settings: Dict
-
-    def serialize(self) -> Dict:
-        return {
-            "listen_host": self.listen_host,
-            "listen_port": self.listen_port,
-            "temp_download_dir": str(self.temp_download_dir.absolute()),
-            "download_directories": [
-                dd.serialize() for dd in self.download_directories
-            ],
-            "shutdown_timeout": self.shutdown_timeout.total_seconds(),
-            "persistence_type": str(self.persistence_type),
-            "logging_settings": self.logging_settings.serialize(),
-            "persistence_settings": self.persistence_settings,
-        }
-
-    @staticmethod
-    def deserialize(data) -> "DownloadManagerSettings":
-        return DownloadManagerSettings(
-            listen_host=data.get("listen_host", "0.0.0.0"),
-            listen_port=data.get("listen_port", 4001),
-            temp_download_dir=Path(data.get("temp_download_dir", "/tmp")).expanduser(),
-            download_directories=[
-                DownloadDirectory.deserialize(item)
-                for item in data["download_directories"]
-            ],
-            shutdown_timeout=timedelta(seconds=data.get("shutdown_timeout", 10)),
-            persistence_type=PersistenceType[data.get("persistence_type", "IN_MEMORY")],
-            logging_settings=LoggingSettings.deserialize(
-                data.get("logging_settings", {})
-            ),
-            persistence_settings=data.get("persistence_settings", {}),
-        )
 
 
 @dataclass
@@ -135,8 +57,9 @@ class _Request:
     future_result: Future
 
 
-class DownloadManagerError(RuntimeError):
-    pass
+class DownloadManagerError(CaptainError):
+    def __init__(self, error_message: str):
+        super().__init__(error_message)
 
 
 def _pop_queue(the_queue: Queue, timeout: timedelta):
@@ -166,42 +89,6 @@ def _cleanup_files(files: List[Union[Path, str]], permanent: bool):
             )
 
 
-class Severity(enum.Enum):
-    INFO = enum.auto()
-    WARNING = enum.auto()
-    ERROR = enum.auto()
-
-
-@dataclass
-class GeneralNotification:
-    severity: Severity
-    message: str
-
-    def serialize(self):
-        return {"severity": self.severity.name, "message": self.message}
-
-
-class EventType(enum.Enum):
-    DOWNLOAD_SCHEDULED = enum.auto()
-    DOWNLOAD_STARTED = enum.auto()
-    PROGRESS_CHANGED = enum.auto()
-    DOWNLOAD_COMPLETE = enum.auto()
-    DOWNLOAD_STOPPED = enum.auto()
-    DOWNLOAD_PAUSED = enum.auto()
-    DOWNLOAD_RESUMED = enum.auto()
-    DOWNLOAD_ERRORED = enum.auto()
-    GENERAL_NOTIFICATION = enum.auto()
-
-
-@dataclass
-class DownloadManagerEvent:
-    event_type: EventType
-    payload: Dict[str, Any]
-
-    def serialize(self):
-        return {"event_type": self.event_type.name, "payload": self.payload}
-
-
 class DownloadManagerObserverBase(Protocol):
     def handle_event(self, event: DownloadManagerEvent):
         raise NotImplementedError("must implement 'handle_event'")
@@ -220,9 +107,7 @@ def public_endpoint(func):
 class DownloadManager(DownloadListenerBase):
     def __init__(self, settings: DownloadManagerSettings):
         self._settings = settings
-        self._db = get_persistence(
-            settings.persistence_type, **settings.persistence_settings
-        )
+        self._db = get_persistence(settings.persistence_settings)
         self._tasks: Dict[DownloadHandle, DownloadProcessWrapper] = dict()
         self._requests = Queue()
         self._stop_flag = threading.Event()
@@ -544,7 +429,9 @@ class DownloadManager(DownloadListenerBase):
                 )
                 invariant(tmp_file_path.is_file())
                 entry.state.downloaded_bytes = tmp_file_path.stat().st_size
-                system_request.data_range = DataRange(entry.state.downloaded_bytes)
+                system_request.data_range = DataRange(
+                    first_byte=entry.state.downloaded_bytes
+                )
                 invariant(handle not in self._tasks)
                 self._tasks[handle] = create_download_process(
                     handle=handle,
@@ -577,7 +464,7 @@ class DownloadManager(DownloadListenerBase):
                 )
             self._db.remove_entry(handle)
             self._notify_observers(
-                Severity.INFO,
+                NotificationSeverity.INFO,
                 f"Removed '{entry.user_request.remote_file_name}' from the list",
             )
             logger.debug(f"removed task: {handle}")
@@ -632,7 +519,7 @@ class DownloadManager(DownloadListenerBase):
                     EventType.DOWNLOAD_STARTED,
                     ExternalDownloadEntry.from_internal(entry),
                 )
-                logger.debug(f"download {handle} started: {metadata.serialize()}")
+                logger.debug(f"download {handle} started: {serialize(metadata)}")
 
     def _handle_download_errored(
         self, update_time: datetime, handle: DownloadHandle, error_info: ErrorInfo
@@ -655,7 +542,7 @@ class DownloadManager(DownloadListenerBase):
                     EventType.DOWNLOAD_ERRORED,
                     ExternalDownloadEntry.from_internal(entry),
                 )
-                logger.warning(f"download {handle} errored: {error_info.serialize()}")
+                logger.warning(f"download {handle} errored: {serialize(error_info)}")
 
     def _handle_download_complete(
         self, update_time: datetime, handle: DownloadHandle
@@ -696,7 +583,7 @@ class DownloadManager(DownloadListenerBase):
                     ExternalDownloadEntry.from_internal(entry),
                 )
                 self._notify_observers(
-                    Severity.INFO,
+                    NotificationSeverity.INFO,
                     f"Download '{entry.user_request.remote_file_name}' complete",
                 )
                 logger.info(f"task {handle} complete")
@@ -859,19 +746,22 @@ class DownloadManager(DownloadListenerBase):
                     f"failure while executing request={request} ref_code={ref_code}: {e}\n{traceback.format_exc()}"
                 )
                 self._notify_observers(
-                    Severity.ERROR, f"Internal error (reference code: {ref_code})"
+                    NotificationSeverity.ERROR,
+                    f"Internal error (reference code: {ref_code})",
                 )
                 request.future_result.set_error(e)
                 logger.debug(f"request end [failure]: {e}")
 
-    def _notify_observers(self, severity: Severity, message: str):
-        notification = GeneralNotification(severity, message)
-        logger.debug(f"notifying observers: {notification.serialize()}")
-        self._update_observers(EventType.GENERAL_NOTIFICATION, notification.serialize())
+    def _notify_observers(self, severity: NotificationSeverity, message: str):
+        notification = GeneralNotification(severity=severity, message=message)
+        logger.debug(f"notifying observers: {serialize(notification)}")
+        self._update_observers(EventType.GENERAL_NOTIFICATION, serialize(notification))
 
     def _update_observers(self, event_type: EventType, payload: Any):
         for observer in self._observers:
-            observer.handle_event(DownloadManagerEvent(event_type, serialize(payload)))
+            observer.handle_event(
+                DownloadManagerEvent(event_type=event_type, payload=serialize(payload))
+            )
 
     def stop(self):
         logger.info("download manager requested to stop")
