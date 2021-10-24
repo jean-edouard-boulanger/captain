@@ -5,6 +5,7 @@ import traceback
 
 from pydantic import BaseModel
 
+from .serialization import serialize, pretty_dump
 from .persistence import PersistenceBase
 from .logging import get_logger
 from .domain import DownloadHandle, DownloadEntry
@@ -14,7 +15,7 @@ logger = get_logger()
 
 class InMemoryPersistence(PersistenceBase):
     class Settings(BaseModel):
-        persistence_type: Literal["in_memory"]
+        persistence_type: Literal["in_memory"] = "in_memory"
         database_file_path: Optional[str] = None
 
     def __init__(self, settings: "InMemoryPersistence.Settings"):
@@ -61,6 +62,6 @@ class InMemoryPersistence(PersistenceBase):
         if self._persist_file_path:
             with self._persist_file_path.open("w") as df:
                 output = {
-                    str(handle): entry.serialize() for handle, entry in self._db.items()
+                    str(handle): serialize(entry) for handle, entry in self._db.items()
                 }
-                df.write(json.dumps(output, indent=4))
+                df.write(pretty_dump(output))

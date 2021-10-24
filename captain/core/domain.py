@@ -6,7 +6,7 @@ import uuid
 import enum
 import os
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 
 class DownloadHandle(BaseModel):
@@ -136,3 +136,31 @@ class DownloadEntry(BaseModel):
     user_request: DownloadRequest
     system_request: Optional[DownloadRequest]
     state: DownloadState
+
+
+class NotificationSeverity(str, enum.Enum):
+    INFO = "INFO"
+    WARNING = "WARNING"
+    ERROR = "ERROR"
+
+
+class GeneralNotification(BaseModel):
+    severity: NotificationSeverity
+    message: str
+
+
+class EventType(str, enum.Enum):
+    DOWNLOAD_SCHEDULED = "DOWNLOAD_SCHEDULED"
+    DOWNLOAD_STARTED = "DOWNLOAD_STARTED"
+    PROGRESS_CHANGED = "PROGRESS_CHANGED"
+    DOWNLOAD_COMPLETE = "DOWNLOAD_COMPLETE"
+    DOWNLOAD_STOPPED = "DOWNLOAD_STOPPED"
+    DOWNLOAD_PAUSED = "DOWNLOAD_PAUSED"
+    DOWNLOAD_RESUMED = "DOWNLOAD_RESUMED"
+    DOWNLOAD_ERRORED = "DOWNLOAD_ERRORED"
+    GENERAL_NOTIFICATION = "GENERAL_NOTIFICATION"
+
+
+class DownloadManagerEvent(BaseModel):
+    event_type: EventType
+    payload: Any

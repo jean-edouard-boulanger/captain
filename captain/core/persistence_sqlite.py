@@ -5,6 +5,7 @@ from pydantic import BaseModel
 import orjson
 import sqlite3
 
+from .serialization import serialize, to_json
 from .persistence import PersistenceBase
 from .domain import DownloadHandle, DownloadEntry
 from .logging import get_logger
@@ -14,7 +15,7 @@ logger = get_logger()
 
 class SQLitePersistence(PersistenceBase):
     class Settings(BaseModel):
-        persistence_type: Literal["sqlite"]
+        persistence_type: Literal["sqlite"] = "sqlite"
         database_file_path: str
 
     def __init__(self, settings: "SQLitePersistence.Settings"):
@@ -48,14 +49,12 @@ class SQLitePersistence(PersistenceBase):
             {"handle": str(handle)},
         )
         row = cursor.fetchone()
-        return DownloadEntry.deserialize(orjson.loads(row["payload"]))
+        return DownloadEntry.parse_obj(orjson.loads(row["payload"]))
 
     def get_all_entries(self) -> List[DownloadEntry]:
         cursor = self._cursor()
         cursor.execute("SELECT payload FROM download_entries")
-        return [
-            DownloadEntry.deserialize(orjson.loads(row["payload"])) for row in cursor
-        ]
+        return [DownloadEntry.parse_obj(orjson.loads(row["payload"])) for row in cursor]
 
     def remove_entry(self, handle) -> None:
         cursor = self._cursor()
@@ -75,7 +74,7 @@ class SQLitePersistence(PersistenceBase):
             VALUES (:handle, :payload)
             ON CONFLICT(handle) DO UPDATE SET payload = excluded.payload;
         """,
-            {"handle": str(entry.handle), "payload": orjson.dumps(entry.serialize())},
+            {"handle": str(entry.handle), "payload": to_json(serialize(entry))},
         )
 
     def flush(self):

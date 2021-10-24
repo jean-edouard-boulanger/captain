@@ -5,11 +5,10 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
 from queue import Queue
+import threading
 import traceback
 import shutil
 import queue
-import enum
-import threading
 import uuid
 import os
 
@@ -34,6 +33,10 @@ from .domain import (
     DownloadHandle,
     ErrorInfo,
     DataRange,
+    NotificationSeverity,
+    GeneralNotification,
+    EventType,
+    DownloadManagerEvent,
 )
 from .invariant import invariant, required_value
 from .future import Future
@@ -84,42 +87,6 @@ def _cleanup_files(files: List[Union[Path, str]], permanent: bool):
                 f"failed to remove file={str(current_file)} "
                 f"with strategy={cleanup_strategy.__name__}: {e}"
             )
-
-
-class Severity(enum.Enum):
-    INFO = enum.auto()
-    WARNING = enum.auto()
-    ERROR = enum.auto()
-
-
-@dataclass
-class GeneralNotification:
-    severity: Severity
-    message: str
-
-    def serialize(self):
-        return {"severity": self.severity.name, "message": self.message}
-
-
-class EventType(enum.Enum):
-    DOWNLOAD_SCHEDULED = enum.auto()
-    DOWNLOAD_STARTED = enum.auto()
-    PROGRESS_CHANGED = enum.auto()
-    DOWNLOAD_COMPLETE = enum.auto()
-    DOWNLOAD_STOPPED = enum.auto()
-    DOWNLOAD_PAUSED = enum.auto()
-    DOWNLOAD_RESUMED = enum.auto()
-    DOWNLOAD_ERRORED = enum.auto()
-    GENERAL_NOTIFICATION = enum.auto()
-
-
-@dataclass
-class DownloadManagerEvent:
-    event_type: EventType
-    payload: Dict[str, Any]
-
-    def serialize(self):
-        return {"event_type": self.event_type.name, "payload": self.payload}
 
 
 class DownloadManagerObserverBase(Protocol):
@@ -497,7 +464,7 @@ class DownloadManager(DownloadListenerBase):
                 )
             self._db.remove_entry(handle)
             self._notify_observers(
-                Severity.INFO,
+                NotificationSeverity.INFO,
                 f"Removed '{entry.user_request.remote_file_name}' from the list",
             )
             logger.debug(f"removed task: {handle}")
@@ -616,7 +583,7 @@ class DownloadManager(DownloadListenerBase):
                     ExternalDownloadEntry.from_internal(entry),
                 )
                 self._notify_observers(
-                    Severity.INFO,
+                    NotificationSeverity.INFO,
                     f"Download '{entry.user_request.remote_file_name}' complete",
                 )
                 logger.info(f"task {handle} complete")
@@ -779,19 +746,22 @@ class DownloadManager(DownloadListenerBase):
                     f"failure while executing request={request} ref_code={ref_code}: {e}\n{traceback.format_exc()}"
                 )
                 self._notify_observers(
-                    Severity.ERROR, f"Internal error (reference code: {ref_code})"
+                    NotificationSeverity.ERROR,
+                    f"Internal error (reference code: {ref_code})",
                 )
                 request.future_result.set_error(e)
                 logger.debug(f"request end [failure]: {e}")
 
-    def _notify_observers(self, severity: Severity, message: str):
-        notification = GeneralNotification(severity, message)
-        logger.debug(f"notifying observers: {notification.serialize()}")
-        self._update_observers(EventType.GENERAL_NOTIFICATION, notification.serialize())
+    def _notify_observers(self, severity: NotificationSeverity, message: str):
+        notification = GeneralNotification(severity=severity, message=message)
+        logger.debug(f"notifying observers: {serialize(notification)}")
+        self._update_observers(EventType.GENERAL_NOTIFICATION, serialize(notification))
 
     def _update_observers(self, event_type: EventType, payload: Any):
         for observer in self._observers:
-            observer.handle_event(DownloadManagerEvent(event_type, serialize(payload)))
+            observer.handle_event(
+                DownloadManagerEvent(event_type=event_type, payload=serialize(payload))
+            )
 
     def stop(self):
         logger.info("download manager requested to stop")

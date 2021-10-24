@@ -95,8 +95,8 @@ class YoutubeDownloadTask(object):
                 datetime.now(),
                 self._handle,
                 ErrorInfo(
-                    f"Could not download '{self._request.remote_file_name}': {e}",
-                    traceback.format_exc(),
+                    message=f"Could not download '{self._request.remote_file_name}': {e}",
+                    stack=traceback.format_exc(),
                 ),
             )
 

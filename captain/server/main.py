@@ -85,7 +85,7 @@ async def sio_publisher(shared_queue: Queue, emit: Callable):
     logger.info(f"subscriber started")
     while True:
         event: DownloadManagerEvent = await shared_queue.get()
-        await emit("download_event", event.serialize())
+        await emit("download_event", serialize(event))
 
 
 def build_recap(manager: DownloadManager):
