@@ -3,7 +3,7 @@ from datetime import datetime
 
 from pydantic import BaseModel
 
-from .download_entities import (
+from .domain import (
     DownloadEntry as InternalDownloadEntry,
     DownloadState as InternalDownloadState,
 )

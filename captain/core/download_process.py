@@ -8,8 +8,10 @@ import queue
 
 from .logging import get_logger
 from .download_listener import MessageBasedDownloadListener
-from .download_entities import DownloadHandle, DownloadRequest
-from .download_task import DownloadTaskBase, DownloadTask, YoutubeDownloadTask
+from .domain import DownloadHandle, DownloadRequest
+from .download_task_http import HttpDownloadTask
+from .download_task_youtube import YoutubeDownloadTask
+from .download_task import DownloadTaskBase
 
 
 logger = get_logger()
@@ -121,7 +123,7 @@ def create_download_process(
     task_type = (
         YoutubeDownloadTask
         if "youtube.com" in request.remote_file_url
-        else DownloadTask
+        else HttpDownloadTask
     )
     return DownloadProcessWrapper(
         handle=handle,

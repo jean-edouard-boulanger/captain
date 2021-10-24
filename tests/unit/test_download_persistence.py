@@ -1,13 +1,13 @@
 import pytest
 
-from captain.core.download_entities import (
+from captain.core.domain import (
     DownloadStatus,
     DownloadHandle,
     DownloadRequest,
     DownloadState,
     DownloadEntry,
 )
-from captain.core.download_persistence import (
+from captain.core.persistence import (
     InMemoryPersistence,
     SQLitePersistence,
     PersistenceType,
