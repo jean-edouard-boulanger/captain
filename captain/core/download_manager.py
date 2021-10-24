@@ -848,7 +848,11 @@ class DownloadManager(DownloadListenerBase):
                 logger.debug(f"request start: {request}")
                 result = request.handler(*request.args, **request.kwargs)
                 request.future_result.set_result(result)
-                logger.debug(f"request end [success]" + f": {result}" if result is not None else "")
+                logger.debug(
+                    f"request end [success]" + f": {result}"
+                    if result is not None
+                    else ""
+                )
             except Exception as e:
                 ref_code = _make_error_reference_code()
                 logger.error(
