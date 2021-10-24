@@ -119,7 +119,9 @@ def invariant(check: bool):
     file_path = Path(frame_info.filename)
     line_number = frame_info.lineno
     broken_invariant = _extract_broken_invariant(file_path, line_number)
-    broken_invariant = broken_invariant or _extract_broken_invariant_naive(traceback.format_stack()[-2])
+    broken_invariant = broken_invariant or _extract_broken_invariant_naive(
+        traceback.format_stack()[-2]
+    )
     metadata = ViolationMetadata(
         file_path=file_path,
         line_number=line_number,

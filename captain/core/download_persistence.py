@@ -42,7 +42,9 @@ class PersistenceBase(Protocol):
             yield entry
             self.persist_entry(entry)
         except Exception as e:
-            logger.warning(f"swallowed exception in scoped persistence block, not persisting {handle}: {e}")
+            logger.warning(
+                f"swallowed exception in scoped persistence block, not persisting {handle}: {e}"
+            )
             raise
 
 

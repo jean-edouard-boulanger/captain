@@ -85,7 +85,7 @@ class DownloadProcessWrapper(object):
         return self._process.is_alive()
 
     def kill(self) -> None:
-        logger.info(f"killing child process pid={self.pid} handle='{self._handle}'")
+        logger.warning(f"killing child process pid={self.pid} handle='{self._handle}'")
         self._process.kill()
 
     def start(self) -> None:
@@ -93,13 +93,14 @@ class DownloadProcessWrapper(object):
         self._process.start()
 
     def stop(self) -> None:
-        if self._supports_graceful_stop and self._process.is_alive():
-            logger.info(f"gracefully stopping child download process pid={self.pid} handle='{self._handle}'")
+        graceful = self._supports_graceful_stop
+        logger.info(
+            f"stopping child download process pid={self.pid} handle={self._handle} graceful={graceful}"
+        )
+        if graceful and self._process.is_alive():
             self._message_queue.put(_Stop())
             return
         if self._process.is_alive():
-            logger.warning(f"child process pid={self.pid} handle='{self._handle}' does not support"
-                           f" graceful stop, killing subprocess")
             self.kill()
         self.join()
         self._listener.download_stopped(update_time=datetime.now(), handle=self._handle)
