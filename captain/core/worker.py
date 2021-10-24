@@ -27,5 +27,8 @@ class Worker(threading.Thread):
             except queue.Empty:
                 pass
 
+    def send(self, message: Any):
+        self._message_queue.put(message)
+
     def stop(self):
-        self._message_queue.put(self._Stop())
+        self.send(self._Stop())
