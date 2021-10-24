@@ -195,7 +195,7 @@ class DownloadState:
             last_update_time=self.last_update_time,
             start_time=self.start_time,
             end_time=self.end_time,
-            error_info=self.error_info.clone() if self.error_info else None
+            error_info=self.error_info.clone() if self.error_info else None,
         )
 
     @property
@@ -289,7 +289,7 @@ class DownloadEntry:
             handle=self.handle.clone(),
             user_request=self.user_request.clone(),
             system_request=self.system_request.clone() if self.system_request else None,
-            state=self.state.clone()
+            state=self.state.clone(),
         )
 
     @serializer

@@ -284,7 +284,7 @@ class YoutubeDownloadTask(object):
             ydl_options = {
                 "format": "best",
                 "progress_hooks": [self._progress_hook],
-                "logger": logger
+                "logger": logger,
             }
             os.chdir(self._download_file_path.parent)
             with youtube_dl.YoutubeDL(ydl_options) as ydl:

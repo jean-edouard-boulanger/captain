@@ -94,7 +94,9 @@ class DownloadProcessWrapper(object):
 
     def stop(self) -> None:
         graceful = self._supports_graceful_stop
-        logger.info(f"stopping child download process pid={self.pid} handle={self._handle} graceful={graceful}")
+        logger.info(
+            f"stopping child download process pid={self.pid} handle={self._handle} graceful={graceful}"
+        )
         if graceful and self._process.is_alive():
             self._message_queue.put(_Stop())
             return
