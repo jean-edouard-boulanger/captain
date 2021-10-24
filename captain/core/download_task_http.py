@@ -167,8 +167,8 @@ class HttpDownloadTask(DownloadTaskBase):
                 datetime.now(),
                 self._handle,
                 ErrorInfo(
-                    f"Could not download '{self._request.remote_file_name}': {_format_error(e)}",
-                    traceback.format_exc(),
+                    message=f"Could not download '{self._request.remote_file_name}': {_format_error(e)}",
+                    stack=traceback.format_exc(),
                 ),
             )
 
@@ -208,8 +208,8 @@ class HttpDownloadTask(DownloadTaskBase):
                 datetime.now(),
                 self._handle,
                 ErrorInfo(
-                    f"Could not download '{self._request.remote_file_name}': {_format_error(e)}",
-                    traceback.format_exc(),
+                    message=f"Could not download '{self._request.remote_file_name}': {_format_error(e)}",
+                    stack=traceback.format_exc(),
                 ),
             )
 
