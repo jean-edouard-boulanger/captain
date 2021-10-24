@@ -248,7 +248,6 @@ class YoutubeDownloadTask(object):
         self._youtube_dl_file_name: Optional[str] = None
 
     def _progress_hook(self, progress: Dict[str, Any]) -> None:
-        print(progress)
         status = progress["status"]
         if status == "downloading":
             if not self._metadata_sent:
@@ -285,6 +284,7 @@ class YoutubeDownloadTask(object):
             ydl_options = {
                 "format": "best",
                 "progress_hooks": [self._progress_hook],
+                "logger": logger
             }
             os.chdir(self._download_file_path.parent)
             with youtube_dl.YoutubeDL(ydl_options) as ydl:

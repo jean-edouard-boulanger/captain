@@ -32,6 +32,7 @@ import shutil
 import queue
 import enum
 import threading
+import uuid
 import pytz
 import os
 
@@ -41,6 +42,10 @@ logger = get_logger()
 DEFAULT_LOGGING_FORMAT = (
     "%(asctime)s (%(threadName)s) [%(levelname)s] %(message)s (%(filename)s:%(lineno)d)"
 )
+
+
+def _make_error_reference_code() -> str:
+    return f"{uuid.uuid4()}"
 
 
 @dataclass
@@ -374,7 +379,7 @@ class DownloadManager(DownloadListenerBase):
             task.kill()
             task.join()
             del self._tasks[handle]
-        if handle in self._db:
+        if self._db.has_entry(handle):
             if post_action == "delete":
                 logger.info(f"removing download {handle} from manager")
                 self._db.remove_entry(handle)
@@ -396,9 +401,15 @@ class DownloadManager(DownloadListenerBase):
             logger.warning(f"error caught in error handler, will cleanup download {handle}"
                            f" post_action={post_action}: {e}")
             self._hard_download_task_cleanup(handle, post_action)
+            if self._db.has_entry(handle):
+                entry = self._db.get_entry(handle)
+                self._update_observers(
+                    EventType.DOWNLOAD_ERRORED, ExternalDownloadEntry.from_internal(entry)
+                )
             raise
 
     def _handle_reschedule_download(self, handle: DownloadHandle, start_at: datetime):
+        logger.info(f"handling reschedule download request handle={handle} start_at={start_at}")
         with self._download_error_handler(handle):
             if not self._db.has_entry(handle):
                 raise DownloadManagerError(f"download entry not found: {handle.handle}")
@@ -416,6 +427,7 @@ class DownloadManager(DownloadListenerBase):
             )
 
     def _handle_start_download(self, handle: DownloadHandle) -> DownloadHandle:
+        logger.info(f"handling start download request handle={handle}")
         with self._download_error_handler(handle):
             invariant(self._db.has_entry(handle))
             invariant(handle not in self._tasks)
@@ -442,6 +454,7 @@ class DownloadManager(DownloadListenerBase):
                 return handle
 
     def _handle_retry_download(self, handle: DownloadHandle):
+        logger.info(f"handling retry download request handle={handle}")
         with self._download_error_handler(handle):
             if not self._db.has_entry(handle):
                 raise DownloadManagerError(f"download entry not found: {handle.handle}")
@@ -468,6 +481,7 @@ class DownloadManager(DownloadListenerBase):
                 self._tasks[handle].start()
 
     def _handle_stop_download(self, handle: DownloadHandle) -> None:
+        logger.info(f"handling stop download request handle={handle}")
         with self._download_error_handler(handle):
             if not self._db.has_entry(handle):
                 raise DownloadManagerError(f"download entry not found: {handle.handle}")
@@ -490,6 +504,7 @@ class DownloadManager(DownloadListenerBase):
                 entry.state.requested_status = DownloadStatus.STOPPED
 
     def _handle_pause_download(self, handle: DownloadHandle):
+        logger.info(f"handling pause download request handle={handle}")
         with self._download_error_handler(handle):
             if not self._db.has_entry(handle):
                 raise DownloadManagerError(f"download entry not found: {handle.handle}")
@@ -503,6 +518,7 @@ class DownloadManager(DownloadListenerBase):
                 entry.state.last_update_time = datetime.now()
 
     def _handle_resume_download(self, handle: DownloadHandle):
+        logger.info(f"handling resume download request handle={handle}")
         with self._download_error_handler(handle):
             if not self._db.has_entry(handle):
                 raise DownloadManagerError(f"download entry not found: {handle.handle}")
@@ -528,6 +544,7 @@ class DownloadManager(DownloadListenerBase):
                 )
 
     def _handle_remove_download(self, handle: DownloadHandle, delete_file: bool):
+        logger.info(f"handling remove download request handle={handle} delete_file={delete_file}")
         with self._download_error_handler(handle, post_action="remove"):
             if not self._db.has_entry(handle):
                 raise DownloadManagerError(f"download entry not found: {handle.handle}")
@@ -550,6 +567,7 @@ class DownloadManager(DownloadListenerBase):
             logger.debug(f"removed task: {handle}")
 
     def _handle_get_download(self, handle: DownloadHandle) -> Dict[str, Any]:
+        logger.info(f"handling get download request handle={handle}")
         if not self._db.has_entry(handle):
             raise DownloadManagerError(f"download entry not found: {handle.handle}")
         return serialize(
@@ -557,6 +575,7 @@ class DownloadManager(DownloadListenerBase):
         )
 
     def _handle_get_downloads(self) -> List[Dict[str, Any]]:
+        logger.info(f"handling get downloads request")
         return [
             serialize(ExternalDownloadEntry.from_internal(entry))
             for entry in self._db.get_all_entries()
@@ -565,6 +584,8 @@ class DownloadManager(DownloadListenerBase):
     def _handle_download_started(
         self, update_time: datetime, handle: DownloadHandle, metadata: DownloadMetadata
     ) -> None:
+        logger.info(f"handling download started event handle={handle} update_time={update_time.isoformat()}"
+                    f" metadata={metadata}")
         with self._download_error_handler(handle):
             invariant(self._db.has_entry(handle))
             with self._db.scoped_entry(handle) as entry:
@@ -594,6 +615,8 @@ class DownloadManager(DownloadListenerBase):
     def _handle_download_errored(
         self, update_time: datetime, handle: DownloadHandle, error_info: ErrorInfo
     ) -> None:
+        logger.info(f"handling download errored event handle={handle} update_time={update_time.isoformat()}"
+                    f" error={error_info.message}")
         with self._download_error_handler(handle):
             invariant(self._db.has_entry(handle))
             invariant(handle in self._tasks)
@@ -612,6 +635,7 @@ class DownloadManager(DownloadListenerBase):
     def _handle_download_complete(
         self, update_time: datetime, handle: DownloadHandle
     ) -> None:
+        logger.info(f"handling download complete event handle={handle} update_time={update_time.isoformat()}")
         with self._download_error_handler(handle):
             invariant(self._db.has_entry(handle))
             invariant(handle in self._tasks)
@@ -647,6 +671,7 @@ class DownloadManager(DownloadListenerBase):
     def _handle_download_stopped(
         self, update_time: datetime, handle: DownloadHandle
     ) -> None:
+        logger.info(f"handling download stopped event handle={handle} update_time={update_time.isoformat()}")
         with self._download_error_handler(handle):
             invariant(self._db.has_entry(handle))
             with self._db.scoped_entry(handle) as entry:
@@ -741,6 +766,7 @@ class DownloadManager(DownloadListenerBase):
         )
 
     def _stop_outstanding_tasks(self):
+        logger.info(f"stopping all outstanding tasks")
         for entry in self._db.get_all_entries():
             if entry.state.can_be_rescheduled:
                 self._scheduler.cancel(required_value(entry.state.schedule_handle))
@@ -788,10 +814,11 @@ class DownloadManager(DownloadListenerBase):
                 request.future_result.set_result(result)
                 logger.debug(f"request end [success]: {result}")
             except Exception as e:
+                ref_code = _make_error_reference_code()
                 logger.error(
-                    f"failure while executing request {request}: {e}\n{traceback.format_exc()}"
+                    f"failure while executing request={request} ref_code={ref_code}: {e}\n{traceback.format_exc()}"
                 )
-                self._notify_observers(Severity.ERROR, str(e))
+                self._notify_observers(Severity.ERROR, f"Internal error (reference code: {ref_code})")
                 request.future_result.set_error(e)
                 logger.debug(f"request end [failure]: {e}")
 
