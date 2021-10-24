@@ -1,11 +1,11 @@
 from .serialization import serialize
 from .logging import get_logger
 from .client_view import DownloadEntry as ExternalDownloadEntry
-from .download_persistence import get_persistence, PersistenceType
+from .persistence import get_persistence, PersistenceType
 from .download_listener import DownloadListenerBase, ThreadedDownloadListenerBridge
 from .download_process import DownloadProcessWrapper, create_download_process
 from .scheduler import Scheduler, ThreadedScheduler
-from .download_entities import (
+from .domain import (
     DownloadState,
     DownloadStatus,
     DownloadMetadata,
@@ -848,7 +848,11 @@ class DownloadManager(DownloadListenerBase):
                 logger.debug(f"request start: {request}")
                 result = request.handler(*request.args, **request.kwargs)
                 request.future_result.set_result(result)
-                logger.debug(f"request end [success]: {result}")
+                logger.debug(
+                    f"request end [success]" + f": {result}"
+                    if result is not None
+                    else ""
+                )
             except Exception as e:
                 ref_code = _make_error_reference_code()
                 logger.error(

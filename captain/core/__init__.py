@@ -5,7 +5,7 @@ from .download_manager import (
     DownloadManagerEvent,
     EventType,
 )
-from .download_entities import (
+from .domain import (
     ErrorInfo,
     DownloadStatus,
     DownloadMetadata,

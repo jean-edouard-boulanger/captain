@@ -1,5 +1,5 @@
 from .logging import get_logger
-from .download_entities import DownloadHandle, DownloadEntry
+from .domain import DownloadHandle, DownloadEntry
 
 import orjson
 

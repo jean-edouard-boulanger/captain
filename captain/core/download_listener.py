@@ -1,5 +1,5 @@
 from .logging import get_logger
-from .download_entities import DownloadMetadata, ErrorInfo, DownloadHandle
+from .domain import DownloadMetadata, ErrorInfo, DownloadHandle
 from .worker import Worker
 
 from datetime import datetime
