@@ -4,7 +4,6 @@ from .client_view import DownloadEntry as ExternalDownloadEntry
 from .download_persistence import get_persistence, PersistenceType
 from .download_listener import DownloadListenerBase, ThreadedDownloadListenerBridge
 from .download_process import DownloadProcessWrapper, create_download_process
-from .worker import Worker
 from .scheduler import Scheduler, ThreadedScheduler
 from .download_entities import (
     DownloadState,
