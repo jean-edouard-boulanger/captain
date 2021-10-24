@@ -5,17 +5,19 @@ import multiprocessing
 import threading
 import signal
 import queue
-import os
 
-from .errors import NotSupportedError
+from .logging import get_logger
 from .download_listener import MessageBasedDownloadListener
 from .download_entities import DownloadHandle, DownloadRequest
 from .download_task import DownloadTaskBase, DownloadTask, YoutubeDownloadTask
 
 
+logger = get_logger()
+
+
 class _InternalDownloadThread(threading.Thread):
     def __init__(self, task: DownloadTaskBase):
-        super().__init__()
+        super().__init__(daemon=False)
         self._task = task
 
     def run(self):
@@ -50,17 +52,17 @@ def _download_process_entrypoint(
     download_thread.start()
     while True:
         try:
-            message = message_queue.get(timeout=1)
+            message = message_queue.get(timeout=0.5)
             if isinstance(message, _Stop):
                 download_thread.stop()
         except queue.Empty:
             pass
-        download_thread.join(timeout=1)
+        download_thread.join(timeout=0.5)
         if not download_thread.is_alive():
             return
 
 
-class DownloadProcess(object):
+class DownloadProcessWrapper(object):
     def __init__(
         self,
         handle: DownloadHandle,
@@ -75,17 +77,35 @@ class DownloadProcess(object):
         self._listener = listener
         self._supports_graceful_stop = supports_graceful_stop
 
-    def start(self):
+    @property
+    def pid(self) -> int:
+        return self._process.pid
+
+    def is_alive(self) -> bool:
+        return self._process.is_alive()
+
+    def kill(self) -> None:
+        logger.info(f"killing child process pid={self.pid} handle='{self._handle}'")
+        self._process.kill()
+
+    def start(self) -> None:
+        logger.info(f"starting child process pid={self.pid} handle='{self._handle}'")
         self._process.start()
 
-    def stop(self):
-        if self._supports_graceful_stop:
-            return self._message_queue.put(_Stop())
-        self._process.kill()
-        self._process.join()
+    def stop(self) -> None:
+        if self._supports_graceful_stop and self._process.is_alive():
+            logger.info(f"gracefully stopping child download process pid={self.pid} handle='{self._handle}'")
+            self._message_queue.put(_Stop())
+            return
+        if self._process.is_alive():
+            logger.warning(f"child process pid={self.pid} handle='{self._handle}' does not support"
+                           f" graceful stop, killing subprocess")
+            self.kill()
+        self.join()
         self._listener.download_stopped(update_time=datetime.now(), handle=self._handle)
 
     def join(self):
+        logger.info(f"joining child process pid={self.pid} handle='{self._handle}'")
         self._process.join()
 
 
@@ -95,21 +115,21 @@ def create_download_process(
     download_file_path: Path,
     listener: MessageBasedDownloadListener,
     progress_report_interval: Optional[timedelta] = None,
-) -> DownloadProcess:
+) -> DownloadProcessWrapper:
     message_queue = multiprocessing.Queue()
     task_type = (
         YoutubeDownloadTask
         if "youtube.com" in request.remote_file_url
         else DownloadTask
     )
-    return DownloadProcess(
+    return DownloadProcessWrapper(
         handle=handle,
         message_queue=message_queue,
         listener=listener,
         supports_graceful_stop=task_type.supports_graceful_stop,
         download_process=multiprocessing.Process(
             target=_download_process_entrypoint,
-            daemon=True,
+            daemon=False,
             args=(
                 message_queue,
                 handle,

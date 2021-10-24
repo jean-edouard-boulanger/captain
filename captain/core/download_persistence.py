@@ -37,9 +37,13 @@ class PersistenceBase(Protocol):
 
     @contextmanager
     def scoped_entry(self, handle: DownloadHandle) -> ContextManager[DownloadEntry]:
-        entry = self.get_entry(handle)
-        yield entry
-        self.persist_entry(entry)
+        try:
+            entry = self.get_entry(handle)
+            yield entry
+            self.persist_entry(entry)
+        except Exception as e:
+            logger.warning(f"swallowed exception in scoped persistence block, not persisting {handle}: {e}")
+            raise
 
 
 class InMemoryPersistence(PersistenceBase):
@@ -59,6 +63,7 @@ class InMemoryPersistence(PersistenceBase):
                         for handle_str, entry_data in data.items()
                     }
             except Exception as e:
+                self._db = {}
                 logger.warning(
                     f"failed to load persisted state: {e}\n{traceback.format_exc()}"
                 )
@@ -67,10 +72,12 @@ class InMemoryPersistence(PersistenceBase):
         return handle in self._db
 
     def get_entry(self, handle: DownloadHandle) -> DownloadEntry:
-        return self._db[handle]
+        if handle not in self._db:
+            raise KeyError(f"unknown download handle: {handle}")
+        return self._db[handle].clone()
 
     def get_all_entries(self) -> List[DownloadEntry]:
-        return list(self._db.values())
+        return [entry.clone() for entry in self._db.values()]
 
     def remove_entry(self, handle) -> None:
         del self._db[handle]

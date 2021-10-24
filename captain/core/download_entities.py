@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from urllib.parse import unquote
 from datetime import datetime
 from pathlib import Path
+import dataclasses
 import enum
 import uuid
 import os
@@ -30,6 +31,9 @@ class DownloadHandle(object):
     def __eq__(self, other: "DownloadHandle"):
         return self.handle == other.handle
 
+    def clone(self) -> "DownloadHandle":
+        return DownloadHandle(handle=self._handle)
+
     @property
     def handle(self) -> uuid.UUID:
         return self._handle
@@ -43,6 +47,9 @@ class DownloadHandle(object):
 class DataRange:
     first_byte: Optional[int] = None
     last_byte: Optional[int] = None
+
+    def clone(self) -> "DataRange":
+        return DataRange(**dataclasses.asdict(self))
 
     def serialize(self) -> Dict:
         return {"first_byte": self.first_byte, "last_byte": self.last_byte}
@@ -64,6 +71,9 @@ class DownloadRequest:
     start_at: Optional[datetime] = None
     auth_payload: Optional[Any] = None
     data_range: Optional[DataRange] = None
+
+    def clone(self) -> "DownloadRequest":
+        return DownloadRequest(**dataclasses.asdict(self))
 
     @property
     def remote_file_name(self):
@@ -101,6 +111,9 @@ class ErrorInfo:
     message: str
     stack: str
 
+    def clone(self) -> "ErrorInfo":
+        return ErrorInfo(**dataclasses.asdict(self))
+
     @serializer
     def serialize(self) -> Dict:
         return {"message": self.message, "stack": self.stack}
@@ -129,6 +142,9 @@ class DownloadMetadata:
     file_size: Optional[int] = None
     file_type: Optional[str] = None
     accept_ranges: Optional[bool] = None
+
+    def clone(self) -> "DownloadMetadata":
+        return DownloadMetadata(**dataclasses.asdict(self))
 
     @serializer
     def serialize(self):
@@ -166,6 +182,21 @@ class DownloadState:
     start_time: Optional[datetime] = None
     end_time: Optional[datetime] = None
     error_info: Optional[ErrorInfo] = None
+
+    def clone(self) -> "DownloadState":
+        return DownloadState(
+            status=self.status,
+            metadata=self.metadata.clone() if self.metadata else None,
+            schedule_handle=self.schedule_handle,
+            downloaded_bytes=self.downloaded_bytes,
+            current_rate=self.current_rate,
+            file_location=self.file_location,
+            requested_status=self.requested_status,
+            last_update_time=self.last_update_time,
+            start_time=self.start_time,
+            end_time=self.end_time,
+            error_info=self.error_info.clone() if self.error_info else None
+        )
 
     @property
     def is_final(self):
@@ -228,15 +259,6 @@ class DownloadState:
             "start_time": self.start_time,
             "end_time": self.end_time,
             "error_info": self.error_info,
-            "properties": {
-                "is_final": self.is_final,
-                "can_be_resumed": self.can_be_resumed,
-                "can_be_paused": self.can_be_paused,
-                "can_be_stopped": self.can_be_stopped,
-                "can_be_retried": self.can_be_retried,
-                "can_be_rescheduled": self.can_be_rescheduled,
-                "can_be_downloaded": self.can_be_downloaded,
-            },
         }
 
     @staticmethod
@@ -261,6 +283,14 @@ class DownloadEntry:
     user_request: DownloadRequest
     system_request: Optional[DownloadRequest]
     state: DownloadState
+
+    def clone(self) -> "DownloadEntry":
+        return DownloadEntry(
+            handle=self.handle.clone(),
+            user_request=self.user_request.clone(),
+            system_request=self.system_request.clone() if self.system_request else None,
+            state=self.state.clone()
+        )
 
     @serializer
     def serialize(self):
