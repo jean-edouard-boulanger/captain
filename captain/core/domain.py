@@ -33,7 +33,7 @@ class DataRange(BaseModel):
 
 class DownloadRequest(BaseModel):
     remote_file_url: str
-    local_dir: Optional[Path] = None
+    download_dir: Optional[Path] = None
     local_file_name: Optional[str] = None
     start_at: Optional[datetime] = None
     auth_payload: Optional[Any] = None

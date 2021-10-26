@@ -328,7 +328,7 @@ class DownloadManager(DownloadListenerBase):
                 invariant(entry.system_request is None)
                 system_request = DownloadRequest(
                     remote_file_url=entry.user_request.remote_file_url,
-                    local_dir=self._settings.temp_download_dir,
+                    download_dir=self._settings.temp_download_dir,
                     local_file_name=f"{handle}.captain",
                     auth_payload=entry.user_request.auth_payload,
                 )
@@ -336,7 +336,7 @@ class DownloadManager(DownloadListenerBase):
                 entry.system_request = system_request
                 entry.state.status = DownloadStatus.PENDING
                 tmp_file_path = (
-                    system_request.local_dir / system_request.local_file_name
+                    system_request.download_dir / system_request.local_file_name
                 )
                 invariant(not tmp_file_path.exists())
                 self._tasks[handle] = create_download_process(
@@ -360,13 +360,13 @@ class DownloadManager(DownloadListenerBase):
                 if not entry.system_request:
                     entry.system_request = DownloadRequest(
                         remote_file_url=entry.user_request.remote_file_url,
-                        local_dir=self._settings.temp_download_dir,
+                        download_dir=self._settings.temp_download_dir,
                         local_file_name=f"{handle}.captain",
                         auth_payload=entry.user_request.auth_payload,
                     )
                 system_request = entry.system_request
                 tmp_file_path = (
-                    system_request.local_dir / system_request.local_file_name
+                    system_request.download_dir / system_request.local_file_name
                 )
                 invariant(handle not in self._tasks)
                 self._tasks[handle] = create_download_process(
@@ -425,7 +425,7 @@ class DownloadManager(DownloadListenerBase):
                 entry.state.requested_status = DownloadStatus.ACTIVE
                 system_request = entry.system_request
                 tmp_file_path = (
-                    system_request.local_dir / system_request.local_file_name
+                    system_request.download_dir / system_request.local_file_name
                 )
                 invariant(tmp_file_path.is_file())
                 entry.state.downloaded_bytes = tmp_file_path.stat().st_size
@@ -560,16 +560,16 @@ class DownloadManager(DownloadListenerBase):
                 invariant(
                     file_size is None or entry.state.downloaded_bytes == file_size
                 )
-                local_dir = Path(entry.user_request.local_dir or os.getcwd())
+                download_dir = Path(entry.user_request.download_dir or os.getcwd())
                 local_file_name = (
                     entry.user_request.local_file_name
                     or entry.state.metadata.remote_file_name
                 )
                 temp_file_path = (
-                    entry.system_request.local_dir
+                    entry.system_request.download_dir
                     / entry.system_request.local_file_name
                 )
-                dest_file_path = local_dir / local_file_name
+                dest_file_path = download_dir / local_file_name
                 logger.info(
                     f"moving temporary file {temp_file_path} to {dest_file_path}"
                 )
@@ -619,7 +619,7 @@ class DownloadManager(DownloadListenerBase):
                     and entry.system_request is not None
                 ):
                     files = [
-                        entry.system_request.local_dir
+                        entry.system_request.download_dir
                         / entry.system_request.local_file_name
                     ]
                     self._queue_request(

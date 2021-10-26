@@ -27,11 +27,21 @@ function defaultCredentials() {
   return {username: null, password: null};
 }
 
+const CUSTOM_DOWNLOAD_DIR_SELECTION = "system-custom";
+
+function getDefaultDownloadLocation(settings) {
+  if(settings.download_directories.length === 0) {
+    return CUSTOM_DOWNLOAD_DIR_SELECTION
+  }
+  return settings.download_directories[0].directory
+}
+
 export function StartDownload({onStart, onCancel, settings, controller}) {
   const [remoteFileUrl, setRemoteFileUrl] = useState(null);
-  const [saveTo, setSaveTo] = useState("system-auto");
-  const [localDir, setLocalDir] = useState(null);
-  const [renameTo, setRenameTo] = useState(null);
+  const [saveTo, setSaveTo] = useState(() => {
+    return getDefaultDownloadLocation(settings)
+  });
+  const [downloadDir, setDownloadDir] = useState(null);
   const [authMode, setAuthMode] = useState(null);
   const [credentials, setCredentials] = useState(defaultCredentials())
   const [formErrors, setFormErrors] = useState({})
@@ -39,11 +49,11 @@ export function StartDownload({onStart, onCancel, settings, controller}) {
 
   useEffect(() => {
     if(isBlank(saveTo)) { return; }
-    if(saveTo === "system-auto" || saveTo === "system-custom") {
-      setLocalDir(null);
+    if(saveTo === CUSTOM_DOWNLOAD_DIR_SELECTION) {
+      setDownloadDir(null);
       return;
     }
-    setLocalDir(saveTo);
+    setDownloadDir(saveTo);
   }, [saveTo]);
 
   const validateForm = async (data) => {
@@ -51,13 +61,13 @@ export function StartDownload({onStart, onCancel, settings, controller}) {
     if(isBlank(data.remoteFileUrl)) {
       errors.remoteFileUrl = true;
     }
-    if(data.saveTo === "system-custom" && isBlank(data.localDir)) {
-      errors.localDir = true;
+    if(data.saveTo === CUSTOM_DOWNLOAD_DIR_SELECTION && isBlank(data.downloadDir)) {
+      errors.downloadDir = true;
     }
-    if(!isBlank(data.localDir)) {
-      const {valid, reason} = await controller.validateDirectory(data.localDir);
+    if(!isBlank(data.downloadDir)) {
+      const {valid, reason} = await controller.validateDirectory(data.downloadDir);
       if(!valid) {
-        errors.localDir = reason;
+        errors.downloadDir = reason;
       }
     }
     if(data.authMode === "simple") {
@@ -78,8 +88,7 @@ export function StartDownload({onStart, onCancel, settings, controller}) {
     const download = {
       remoteFileUrl,
       saveTo,
-      localDir,
-      renameTo,
+      downloadDir,
       authMode,
       credentials
     };
@@ -92,8 +101,8 @@ export function StartDownload({onStart, onCancel, settings, controller}) {
 
   const resetForm = () => {
     setRemoteFileUrl(null);
-    setSaveTo("system-auto");
-    setLocalDir(null);
+    setSaveTo(getDefaultDownloadLocation(settings));
+    setDownloadDir(null);
     setAuthMode(null);
     setCredentials(defaultCredentials());
     setFormErrors({});
@@ -126,7 +135,7 @@ export function StartDownload({onStart, onCancel, settings, controller}) {
 
   useEffect(() => {
     setFormErrors({})
-  }, [remoteFileUrl, saveTo, localDir, renameTo, authMode, credentials]);
+  }, [remoteFileUrl, saveTo, downloadDir, authMode, credentials]);
 
   return (
     <Card>
@@ -150,11 +159,10 @@ export function StartDownload({onStart, onCancel, settings, controller}) {
                 <FormControl style={{minWidth: 200}}>
                   <InputLabel id="save-to-select-label">Save to</InputLabel>
                   <Select labelId="save-to-select-label"
-                          value={saveTo || "system-auto"}
+                          value={saveTo}
                           onChange={(event) => {
                             setSaveTo(event.target.value)
                           }} >
-                    <MenuItem value="system-auto">Automatic</MenuItem>
                     {
                       (settings !== null) &&
                       [
@@ -167,27 +175,19 @@ export function StartDownload({onStart, onCancel, settings, controller}) {
                       ]
                     }
                     <ListSubheader><Divider /></ListSubheader>,
-                    <MenuItem value="system-custom">Custom</MenuItem>
+                    <MenuItem value={CUSTOM_DOWNLOAD_DIR_SELECTION}>Custom</MenuItem>
                   </Select>
                 </FormControl>
               </Box>
-              <Box m={1} flexGrow={1} hidden={saveTo === "system-auto"}>
+              <Box m={1} flexGrow={1}>
                 <TextField label="Directory"
-                           value={localDir || ""}
-                           error={formErrors.localDir !== undefined}
-                           onChange={(e) => {setLocalDir(e.target.value)}}
-                           helperText={formErrors.localDir || ""}
-                           disabled={saveTo !== "system-custom"}
+                           value={downloadDir || ""}
+                           error={formErrors.downloadDir !== undefined}
+                           onChange={(e) => {setDownloadDir(e.target.value)}}
+                           helperText={formErrors.downloadDir || ""}
+                           disabled={saveTo !== CUSTOM_DOWNLOAD_DIR_SELECTION}
                            fullWidth />
               </Box>
-            </Box>
-          </Grid>
-          <Grid item>
-            <Box m={1}>
-              <TextField label="Rename file to"
-                         value={renameTo || ""}
-                         onChange={(e) => {setRenameTo(e.target.value)}}
-                         fullWidth />
             </Box>
           </Grid>
           <Grid item>
