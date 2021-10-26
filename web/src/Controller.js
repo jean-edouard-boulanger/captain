@@ -91,8 +91,7 @@ export function makeController({endpoint, socket}) {
       };
       socket.emit("start_download", {
         remote_file_url: download.remoteFileUrl,
-        local_dir: download.localDir,
-        local_file_name: download.renameTo,
+        download_dir: download.downloadDir,
         start_at: makeStartAt(),
         auth_payload: makeAuth()
       });
