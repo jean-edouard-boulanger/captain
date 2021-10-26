@@ -36,8 +36,8 @@ class _Stop(object):
 def _download_process_entrypoint(
     message_queue: multiprocessing.Queue,
     handle: DownloadHandle,
-    request: DownloadRequest,
-    download_file_path: Path,
+    download_request: DownloadRequest,
+    work_dir: Path,
     listener: MessageBasedDownloadListener,
     progress_report_interval: Optional[timedelta],
     task_type: Type,
@@ -45,8 +45,8 @@ def _download_process_entrypoint(
     signal.signal(signal.SIGINT, signal.SIG_IGN)
     download_task = task_type(
         handle=handle,
-        request=request,
-        download_file_path=download_file_path,
+        download_request=download_request,
+        work_dir=work_dir,
         listener=listener,
         progress_report_interval=progress_report_interval,
     )
@@ -114,15 +114,15 @@ class DownloadProcessWrapper(object):
 
 def create_download_process(
     handle: DownloadHandle,
-    request: DownloadRequest,
-    download_file_path: Path,
+    download_request: DownloadRequest,
+    work_dir: Path,
     listener: MessageBasedDownloadListener,
     progress_report_interval: Optional[timedelta] = None,
 ) -> DownloadProcessWrapper:
     message_queue = multiprocessing.Queue()
     task_type = (
         YoutubeDownloadTask
-        if "youtube.com" in request.remote_file_url
+        if "youtube.com" in download_request.remote_file_url
         else HttpDownloadTask
     )
     return DownloadProcessWrapper(
@@ -136,8 +136,8 @@ def create_download_process(
             args=(
                 message_queue,
                 handle,
-                request,
-                download_file_path,
+                download_request,
+                work_dir,
                 listener,
                 progress_report_interval,
                 task_type,

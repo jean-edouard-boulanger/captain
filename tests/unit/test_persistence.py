@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import pytest
 
 from captain.core.domain import (
@@ -16,9 +18,14 @@ from captain.core.serialization import pretty_dump
 def create_dummy_download_entry() -> DownloadEntry:
     return DownloadEntry(
         handle=DownloadHandle.make(),
-        user_request=DownloadRequest(remote_file_url=""),
-        system_request=DownloadRequest(remote_file_url=""),
-        state=DownloadState(status=DownloadStatus.ACTIVE),
+        user_request=DownloadRequest(
+            remote_file_url="",
+            download_dir=Path("/Downloads")
+        ),
+        state=DownloadState(
+            status=DownloadStatus.ACTIVE,
+            work_dir=Path("/tmp")
+        ),
     )
 
 

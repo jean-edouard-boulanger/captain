@@ -114,14 +114,14 @@ class HttpDownloadTask(DownloadTaskBase):
     def __init__(
         self,
         handle: DownloadHandle,
-        request: DownloadRequest,
-        download_file_path: Path,
+        download_request: DownloadRequest,
+        work_dir: Path,
         listener: Optional[DownloadListenerBase] = None,
         progress_report_interval: Optional[timedelta] = None,
     ):
         self._handle = handle
-        self._request = request
-        self._download_file_path = download_file_path
+        self._request = download_request
+        self._work_dir = work_dir
         self._listener = listener or NoOpDownloadListener()
         self._stopped_flag = Event()
         self._progress_report_interval = progress_report_interval or timedelta(
@@ -157,9 +157,11 @@ class HttpDownloadTask(DownloadTaskBase):
                 return
             download_buffer.write(next_chunk)
 
-    def _download_loop(self, response: requests.Response) -> None:
+    def _download_loop(
+        self, response: requests.Response, downloaded_file_path: Path
+    ) -> None:
         try:
-            with self._download_file_path.open("ab") as f:
+            with downloaded_file_path.open("ab") as f:
                 self._download_loop_impl(response, f)
         except Exception as e:
             logger.error(f"while downloading file: {e}\n{traceback.format_exc()}")
@@ -176,9 +178,8 @@ class HttpDownloadTask(DownloadTaskBase):
         settings = self._request
         url_meta = urlparse(settings.remote_file_url)
         remote_file_name = unquote(os.path.basename(url_meta.path))
-        download_metadata = DownloadMetadata(
-            remote_file_name=remote_file_name, remote_url=settings.remote_file_url
-        )
+        downloaded_file_path = self._work_dir / remote_file_name
+        download_metadata = DownloadMetadata(downloaded_file_path=downloaded_file_path)
         request_settings = {"verify": False, "stream": True, "headers": {}}
         if settings.auth_payload:
             request_settings["auth"] = _parse_auth_payload(settings.auth_payload)
@@ -197,7 +198,7 @@ class HttpDownloadTask(DownloadTaskBase):
             self._listener.download_started(
                 datetime.now(), self._handle, download_metadata
             )
-            self._download_loop(response)
+            self._download_loop(response, downloaded_file_path)
 
     def run(self):
         try:

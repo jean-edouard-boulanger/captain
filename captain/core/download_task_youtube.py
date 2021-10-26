@@ -14,7 +14,6 @@ from typing import Optional, Dict, Any
 from datetime import datetime, timedelta
 from pathlib import Path
 import traceback
-import shutil
 import os
 
 
@@ -27,30 +26,29 @@ class YoutubeDownloadTask(object):
     def __init__(
         self,
         handle: DownloadHandle,
-        request: DownloadRequest,
-        download_file_path: Path,
+        download_request: DownloadRequest,
+        work_dir: Path,
         listener: Optional[DownloadListenerBase] = None,
         progress_report_interval: Optional[timedelta] = None,
     ):
         self._handle = handle
-        self._request = request
+        self._request = download_request
         self._listener = listener
-        self._download_file_path = download_file_path
+        self._work_dir = work_dir
         self._metadata_sent = False
         self._last_downloaded_byte: Optional[int] = None
-        self._youtube_dl_file_name: Optional[str] = None
+        self._downloaded_file_path: Optional[Path] = None
 
     def _progress_hook(self, progress: Dict[str, Any]) -> None:
         status = progress["status"]
         if status == "downloading":
             if not self._metadata_sent:
-                self._youtube_dl_file_name = progress["filename"]
+                self._downloaded_file_path = self._work_dir / progress["filename"]
                 self._listener.download_started(
                     update_time=datetime.now(),
                     handle=self._handle,
                     metadata=DownloadMetadata(
-                        remote_url=self._request.remote_file_url,
-                        remote_file_name=self._youtube_dl_file_name,
+                        downloaded_file_path=self._downloaded_file_path,
                         file_size=progress["total_bytes"],
                     ),
                 )
@@ -79,13 +77,9 @@ class YoutubeDownloadTask(object):
                 "progress_hooks": [self._progress_hook],
                 "logger": logger,
             }
-            os.chdir(self._download_file_path.parent)
+            os.chdir(self._work_dir)
             with youtube_dl.YoutubeDL(ydl_options) as ydl:
                 ydl.download([self._request.remote_file_url])
-            shutil.move(
-                self._download_file_path.parent.joinpath(self._youtube_dl_file_name),
-                self._download_file_path,
-            )
             self._listener.download_complete(
                 update_time=datetime.now(), handle=self._handle
             )

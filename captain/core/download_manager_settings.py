@@ -39,6 +39,7 @@ class DownloadManagerSettings(BaseModel):
     temp_download_dir: Path = Path("/tmp")
     download_directories: List[DownloadDirectory] = Field(default_factory=list)
     shutdown_timeout: timedelta = timedelta(seconds=10)
+    send_files_to_trash: bool = False
     persistence_settings: Annotated[
         PersistenceSettingsType, Field(discriminator="persistence_type")
     ]
