@@ -10,7 +10,7 @@ CAPTAIN_USER=captain
 getent group ${CAPTAIN_USER} >/dev/null 2>&1 || groupadd ${CAPTAIN_USER}
 id -u ${CAPTAIN_USER} >/dev/null 2>&1 || useradd -d /home/${CAPTAIN_USER} -g ${CAPTAIN_USER} -m ${CAPTAIN_USER}
 
-python3.8 setup.py build install
+python3.9 setup.py build install
 mkdir -p /etc/captain/
 if [[ ! -f /etc/captain/config.yml ]]
 then
