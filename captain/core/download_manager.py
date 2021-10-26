@@ -24,6 +24,7 @@ from .download_listener import DownloadListenerBase, ThreadedDownloadListenerBri
 from .download_process import DownloadProcessWrapper, create_download_process
 from .scheduler import Scheduler, ThreadedScheduler
 from .errors import CaptainError
+from .fs import empty_directory, remove_directory
 from .domain import (
     DownloadState,
     DownloadStatus,
@@ -79,12 +80,14 @@ def _cleanup_files(files: List[Union[Path, str]], permanent: bool):
     assert isinstance(files, list)
     cleanup_strategy = os.remove if permanent else _send_file_to_trash
     for current_file in files:
-        logger.info(f"cleaning up: {current_file}")
+        logger.info(
+            f"cleaning up file_path={current_file} strategy={cleanup_strategy.__name__}"
+        )
         try:
             cleanup_strategy(str(current_file))
         except Exception as e:
             logger.warning(
-                f"failed to remove file={str(current_file)} "
+                f"failed to clean up file={str(current_file)} "
                 f"with strategy={cleanup_strategy.__name__}: {e}"
             )
 
@@ -239,11 +242,13 @@ class DownloadManager(DownloadListenerBase):
     def _handle_schedule_download(self, request: DownloadRequest) -> DownloadHandle:
         handle = DownloadHandle.make()
         invariant(not self._db.has_entry(handle))
+        work_dir = self.settings.temp_download_dir / f"{handle}.captain"
+        logger.debug(f"creating work directory {work_dir} for download handle={handle}")
+        work_dir.mkdir()
         entry = DownloadEntry(
             handle=handle,
             user_request=request,
-            system_request=None,
-            state=DownloadState(status=DownloadStatus.SCHEDULED),
+            state=DownloadState(status=DownloadStatus.SCHEDULED, work_dir=work_dir),
         )
         start_at = request.start_at if request.start_at else datetime.now(pytz.utc)
         schedule_handle = self._defer_request(
@@ -267,6 +272,17 @@ class DownloadManager(DownloadListenerBase):
             task.join()
             del self._tasks[handle]
         if self._db.has_entry(handle):
+            task_work_dir = self._db.get_entry(handle).state.work_dir
+            if task_work_dir and task_work_dir.is_dir():
+                logger.info(
+                    f"emptying download {handle} work directory {task_work_dir}"
+                )
+                try:
+                    empty_directory(task_work_dir)
+                except Exception as e:
+                    logger.warning(
+                        f"failed to empty download {handle} work directory {task_work_dir}: {e}"
+                    )
             if post_action == "delete":
                 logger.info(f"removing download {handle} from manager")
                 self._db.remove_entry(handle)
@@ -325,24 +341,12 @@ class DownloadManager(DownloadListenerBase):
             invariant(self._db.has_entry(handle))
             invariant(handle not in self._tasks)
             with self._db.scoped_entry(handle) as entry:
-                invariant(entry.system_request is None)
-                system_request = DownloadRequest(
-                    remote_file_url=entry.user_request.remote_file_url,
-                    download_dir=self._settings.temp_download_dir,
-                    local_file_name=f"{handle}.captain",
-                    auth_payload=entry.user_request.auth_payload,
-                )
                 entry.state.schedule_handle = None
-                entry.system_request = system_request
                 entry.state.status = DownloadStatus.PENDING
-                tmp_file_path = (
-                    system_request.download_dir / system_request.local_file_name
-                )
-                invariant(not tmp_file_path.exists())
                 self._tasks[handle] = create_download_process(
                     handle=handle,
-                    request=system_request,
-                    download_file_path=tmp_file_path,
+                    download_request=entry.user_request,
+                    work_dir=entry.state.work_dir,
                     listener=self._listener_bridge.make_listener(),
                 )
                 self._tasks[handle].start()
@@ -356,23 +360,18 @@ class DownloadManager(DownloadListenerBase):
             with self._db.scoped_entry(handle) as entry:
                 if not entry.state.can_be_retried:
                     raise DownloadManagerError(f"cannot retry download")
-                entry.state = DownloadState(status=DownloadStatus.PENDING)
-                if not entry.system_request:
-                    entry.system_request = DownloadRequest(
-                        remote_file_url=entry.user_request.remote_file_url,
-                        download_dir=self._settings.temp_download_dir,
-                        local_file_name=f"{handle}.captain",
-                        auth_payload=entry.user_request.auth_payload,
-                    )
-                system_request = entry.system_request
-                tmp_file_path = (
-                    system_request.download_dir / system_request.local_file_name
+                work_dir = entry.state.work_dir
+                invariant(work_dir.exists())
+                logger.debug(f"clearing work directory {work_dir}")
+                empty_directory(work_dir)
+                entry.state = DownloadState(
+                    status=DownloadStatus.PENDING, work_dir=work_dir
                 )
                 invariant(handle not in self._tasks)
                 self._tasks[handle] = create_download_process(
                     handle=handle,
-                    request=system_request,
-                    download_file_path=tmp_file_path,
+                    download_request=entry.user_request,
+                    work_dir=work_dir,
                     listener=self._listener_bridge.make_listener(),
                 )
                 self._tasks[handle].start()
@@ -396,7 +395,8 @@ class DownloadManager(DownloadListenerBase):
                         in {DownloadStatus.PAUSED, DownloadStatus.SCHEDULED}
                     )
                     entry.state.requested_status = DownloadStatus.STOPPED
-                    return self._handle_download_stopped(datetime.now(), handle)
+                    self._handle_download_stopped(datetime.now(), handle)
+                    return
                 task.stop()
                 entry.state.requested_status = DownloadStatus.STOPPED
 
@@ -423,20 +423,19 @@ class DownloadManager(DownloadListenerBase):
                 if not entry.state.can_be_resumed:
                     raise DownloadManagerError("cannot resume task")
                 entry.state.requested_status = DownloadStatus.ACTIVE
-                system_request = entry.system_request
-                tmp_file_path = (
-                    system_request.download_dir / system_request.local_file_name
-                )
+                invariant(entry.state.metadata is not None)
+                tmp_file_path = entry.state.metadata.downloaded_file_path
                 invariant(tmp_file_path.is_file())
                 entry.state.downloaded_bytes = tmp_file_path.stat().st_size
-                system_request.data_range = DataRange(
+                download_request = entry.user_request.copy()
+                download_request.data_range = DataRange(
                     first_byte=entry.state.downloaded_bytes
                 )
                 invariant(handle not in self._tasks)
                 self._tasks[handle] = create_download_process(
                     handle=handle,
-                    request=system_request,
-                    download_file_path=tmp_file_path,
+                    download_request=download_request,
+                    work_dir=entry.state.work_dir,
                     listener=self._listener_bridge.make_listener(),
                 )
                 self._tasks[handle].start()
@@ -455,13 +454,17 @@ class DownloadManager(DownloadListenerBase):
             if (
                 delete_file
                 and entry.state.file_location
-                and os.path.isfile(entry.state.file_location)
+                and entry.state.file_location.is_file()
             ):
+                logger.info(f"removing downloaded file {entry.state.file_location}")
                 self._queue_request(
                     _cleanup_files,
                     args=([entry.state.file_location],),
-                    kwargs={"permanent": False},
+                    kwargs={"permanent": not self._settings.send_files_to_trash},
                 )
+            if entry.state.work_dir.is_dir():
+                logger.info(f"removing work directory {entry.state.work_dir}")
+                remove_directory(entry.state.work_dir)
             self._db.remove_entry(handle)
             self._notify_observers(
                 NotificationSeverity.INFO,
@@ -543,6 +546,7 @@ class DownloadManager(DownloadListenerBase):
                     ExternalDownloadEntry.from_internal(entry),
                 )
                 logger.warning(f"download {handle} errored: {serialize(error_info)}")
+            empty_directory(entry.state.work_dir)
 
     def _handle_download_complete(
         self, update_time: datetime, handle: DownloadHandle
@@ -560,21 +564,17 @@ class DownloadManager(DownloadListenerBase):
                 invariant(
                     file_size is None or entry.state.downloaded_bytes == file_size
                 )
-                download_dir = Path(entry.user_request.download_dir or os.getcwd())
-                local_file_name = (
-                    entry.user_request.local_file_name
-                    or entry.state.metadata.remote_file_name
+                invariant(entry.state.metadata is not None)
+                downloaded_file_path = entry.state.metadata.downloaded_file_path
+                invariant(downloaded_file_path.is_file())
+                dest_file_path = (
+                    entry.user_request.download_dir / downloaded_file_path.name
                 )
-                temp_file_path = (
-                    entry.system_request.download_dir
-                    / entry.system_request.local_file_name
-                )
-                dest_file_path = download_dir / local_file_name
                 logger.info(
-                    f"moving temporary file {temp_file_path} to {dest_file_path}"
+                    f"moving temporary file {downloaded_file_path} to {dest_file_path}"
                 )
-                shutil.move(str(temp_file_path), str(dest_file_path))
-                entry.state.file_location = str(dest_file_path)
+                shutil.move(str(downloaded_file_path), str(dest_file_path))
+                entry.state.file_location = dest_file_path
                 entry.state.status = DownloadStatus.COMPLETE
                 entry.state.end_time = datetime.now()
                 entry.state.last_update_time = update_time
@@ -587,6 +587,7 @@ class DownloadManager(DownloadListenerBase):
                     f"Download '{entry.user_request.remote_file_name}' complete",
                 )
                 logger.info(f"task {handle} complete")
+                remove_directory(entry.state.work_dir)
 
     def _handle_download_stopped(
         self, update_time: datetime, handle: DownloadHandle
@@ -614,19 +615,12 @@ class DownloadManager(DownloadListenerBase):
                 entry.state.status = requested_status
                 entry.state.requested_status = None
                 entry.state.end_time = update_time
-                if (
-                    requested_status == DownloadStatus.STOPPED
-                    and entry.system_request is not None
-                ):
-                    files = [
-                        entry.system_request.download_dir
-                        / entry.system_request.local_file_name
-                    ]
-                    self._queue_request(
-                        _cleanup_files, args=(files,), kwargs={"permanent": True}
-                    )
+                if requested_status == DownloadStatus.STOPPED:
+                    empty_directory(entry.state.work_dir)
                 self._update_observers(
-                    required_value(requested_status),
+                    EventType.DOWNLOAD_PAUSED
+                    if requested_status == DownloadStatus.PAUSED
+                    else EventType.DOWNLOAD_STOPPED,
                     ExternalDownloadEntry.from_internal(entry),
                 )
 

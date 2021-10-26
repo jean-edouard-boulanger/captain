@@ -31,15 +31,16 @@ const CUSTOM_DOWNLOAD_DIR_SELECTION = "system-custom";
 
 function getDefaultDownloadLocation(settings) {
   if(settings.download_directories.length === 0) {
-    return CUSTOM_DOWNLOAD_DIR_SELECTION
+    return [CUSTOM_DOWNLOAD_DIR_SELECTION, null];
   }
-  return settings.download_directories[0].directory
+  const download_dir = settings.download_directories[0].directory;
+  return [download_dir, download_dir]
 }
 
 export function StartDownload({onStart, onCancel, settings, controller}) {
   const [remoteFileUrl, setRemoteFileUrl] = useState(null);
   const [saveTo, setSaveTo] = useState(() => {
-    return getDefaultDownloadLocation(settings)
+    return getDefaultDownloadLocation(settings)[0]
   });
   const [downloadDir, setDownloadDir] = useState(null);
   const [authMode, setAuthMode] = useState(null);
@@ -100,9 +101,10 @@ export function StartDownload({onStart, onCancel, settings, controller}) {
   };
 
   const resetForm = () => {
+    const [defaultSaveTo, defaultDownloadDir] = getDefaultDownloadLocation(settings)
     setRemoteFileUrl(null);
-    setSaveTo(getDefaultDownloadLocation(settings));
-    setDownloadDir(null);
+    setSaveTo(defaultSaveTo);
+    setDownloadDir(defaultDownloadDir);
     setAuthMode(null);
     setCredentials(defaultCredentials());
     setFormErrors({});

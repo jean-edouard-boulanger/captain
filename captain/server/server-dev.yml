@@ -11,6 +11,7 @@ download_directories:
   - directory: ~/Documents
     label: Documents
 shutdown_timeout: 10
+send_files_to_trash: true
 persistence_settings:
   persistence_type: in_memory
   database_file_path: ~/.captain/db.json

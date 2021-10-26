@@ -33,8 +33,7 @@ class DataRange(BaseModel):
 
 class DownloadRequest(BaseModel):
     remote_file_url: str
-    download_dir: Optional[Path] = None
-    local_file_name: Optional[str] = None
+    download_dir: Path
     start_at: Optional[datetime] = None
     auth_payload: Optional[Any] = None
     data_range: Optional[DataRange] = None
@@ -60,8 +59,7 @@ class DownloadStatus(str, enum.Enum):
 
 
 class DownloadMetadata(BaseModel):
-    remote_url: str
-    remote_file_name: str
+    downloaded_file_path: Path
     file_size: Optional[int] = None
     file_type: Optional[str] = None
     accept_ranges: Optional[bool] = None
@@ -69,6 +67,7 @@ class DownloadMetadata(BaseModel):
 
 class DownloadState(BaseModel):
     status: DownloadStatus
+    work_dir: Path
     metadata: Optional[DownloadMetadata] = None
     schedule_handle: Optional[int] = None
     downloaded_bytes: Optional[int] = None
@@ -134,7 +133,6 @@ class DownloadState(BaseModel):
 class DownloadEntry(BaseModel):
     handle: DownloadHandle
     user_request: DownloadRequest
-    system_request: Optional[DownloadRequest]
     state: DownloadState
 
 
