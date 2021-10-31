@@ -151,7 +151,7 @@ class Scheduler(object):
 
 class ThreadedScheduler(Thread):
     def __init__(self, scheduler: Scheduler):
-        super().__init__()
+        super().__init__(name="download-scheduler")
         self._scheduler = scheduler
 
     def run(self) -> None:

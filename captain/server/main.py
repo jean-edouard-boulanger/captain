@@ -52,7 +52,9 @@ def get_manager() -> DownloadManager:
 
 def init_manager(settings: DownloadManagerSettings) -> DownloadManager:
     get_manager.manager = DownloadManager(settings)
-    get_manager.manager_thread = threading.Thread(target=get_manager.manager.run)
+    get_manager.manager_thread = threading.Thread(
+        target=get_manager.manager.run, name="download-manager"
+    )
     return get_manager.manager
 
 

@@ -19,8 +19,8 @@ logger = get_logger()
 
 
 class _InternalDownloadThread(threading.Thread):
-    def __init__(self, task: DownloadTaskBase):
-        super().__init__(daemon=False)
+    def __init__(self, handle: DownloadHandle, task: DownloadTaskBase):
+        super().__init__(daemon=False, name=f"download-{handle}")
         self._task = task
 
     def run(self):
@@ -53,7 +53,7 @@ def _download_process_entrypoint(
         listener=listener,
         progress_report_interval=progress_report_interval,
     )
-    download_thread = _InternalDownloadThread(download_task)
+    download_thread = _InternalDownloadThread(handle, download_task)
     download_thread.start()
     while True:
         try:
