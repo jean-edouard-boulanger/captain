@@ -1,3 +1,4 @@
+from .helpers import set_thread_name
 from .logging import get_logger
 from .future import Future
 
@@ -151,10 +152,12 @@ class Scheduler(object):
 
 class ThreadedScheduler(Thread):
     def __init__(self, scheduler: Scheduler):
-        super().__init__(name="download-scheduler")
+        self._thread_name = "DownloadScheduler"
+        super().__init__(name=self._thread_name)
         self._scheduler = scheduler
 
     def run(self) -> None:
+        set_thread_name(self._thread_name)
         return self._scheduler.run()
 
     def schedule(self, at: datetime, action: Action):

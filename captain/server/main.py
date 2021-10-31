@@ -1,4 +1,5 @@
 from captain.core.serialization import serialize
+from captain.core.helpers import set_thread_name
 from captain.core.logging import get_logger
 from captain.core import (
     DownloadManager,
@@ -43,6 +44,9 @@ logger = get_logger()
 os.environ["PYTHONWARNINGS"] = "ignore:Unverified HTTPS request"
 
 
+MANAGER_THREAD_NAME = "DownloadManager"
+
+
 def get_manager() -> DownloadManager:
     manager = get_manager.manager
     if manager is None:
@@ -51,18 +55,21 @@ def get_manager() -> DownloadManager:
 
 
 def init_manager(settings: DownloadManagerSettings) -> DownloadManager:
+    def manager_thread_endpoint() -> None:
+        set_thread_name(MANAGER_THREAD_NAME)
+        get_manager().run()
     get_manager.manager = DownloadManager(settings)
     get_manager.manager_thread = threading.Thread(
-        target=get_manager.manager.run, name="download-manager"
-    )
+        target=manager_thread_endpoint,
+        name=MANAGER_THREAD_NAME)
     return get_manager.manager
 
 
-def start_manager():
+def start_manager() -> None:
     get_manager.manager_thread.start()
 
 
-def stop_manager():
+def stop_manager() -> None:
     get_manager.manager.stop()
     get_manager.manager_thread.join()
 

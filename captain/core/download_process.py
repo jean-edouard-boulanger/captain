@@ -7,7 +7,7 @@ import signal
 import queue
 
 from .logging import get_logger
-from .helpers import make_kwargs
+from .helpers import make_kwargs, set_thread_name
 from .download_listener import MessageBasedDownloadListener
 from .domain import DownloadHandle, DownloadRequest, DownloadMetadata
 from .download_task_http import HttpDownloadTask
@@ -19,11 +19,13 @@ logger = get_logger()
 
 
 class _InternalDownloadThread(threading.Thread):
-    def __init__(self, handle: DownloadHandle, task: DownloadTaskBase):
-        super().__init__(daemon=False, name=f"download-{handle}")
+    def __init__(self, thread_name: str, task: DownloadTaskBase):
+        self._thread_name = thread_name
+        super().__init__(daemon=False, name=thread_name)
         self._task = task
 
     def run(self):
+        set_thread_name(self._thread_name)
         self._task.run()
 
     def stop(self):
@@ -53,7 +55,8 @@ def _download_process_entrypoint(
         listener=listener,
         progress_report_interval=progress_report_interval,
     )
-    download_thread = _InternalDownloadThread(handle, download_task)
+    thread_name = f"{task_type.__name__}-{handle}"
+    download_thread = _InternalDownloadThread(thread_name, download_task)
     download_thread.start()
     while True:
         try:

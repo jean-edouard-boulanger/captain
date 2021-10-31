@@ -2,6 +2,8 @@ from typing import Any, TypeVar, Optional
 import threading
 import queue
 
+from .helpers import set_thread_name
+
 
 QueueType = TypeVar("QueueType", bound=queue.Queue)
 
@@ -20,6 +22,7 @@ class Worker(threading.Thread):
         raise NotImplementedError("workers must implement 'consume_message'")
 
     def run(self) -> None:
+        set_thread_name(self.name)
         while True:
             try:
                 message = self._message_queue.get()

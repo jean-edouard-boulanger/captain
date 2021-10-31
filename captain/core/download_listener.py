@@ -125,7 +125,7 @@ class MessageBasedDownloadListener(DownloadListenerBase):
 
 class ThreadedDownloadListenerBridge(Worker):
     def __init__(self, listener: DownloadListenerBase):
-        super().__init__(multiprocessing.Queue(), name="download-listener-bridge")
+        super().__init__(multiprocessing.Queue(), name="DownloadListenerBridge")
         self._listener = listener
 
     def consume_message(self, message: Dict[str, Dict[str, Any]]) -> None:
