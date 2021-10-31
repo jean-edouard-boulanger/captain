@@ -1,6 +1,15 @@
+from typing import Optional, Any, TypedDict
+from datetime import datetime, timedelta
+from pathlib import Path
+import traceback
+import os
+
+import youtube_dl
+
 from .logging import get_logger
 from .errors import NotSupportedError
 from .download_listener import DownloadListenerBase
+from .download_task import DownloadTaskBase
 from .domain import (
     DownloadRequest,
     DownloadMetadata,
@@ -8,73 +17,96 @@ from .domain import (
     ErrorInfo,
 )
 
-import youtube_dl
-
-from typing import Optional, Dict, Any
-from datetime import datetime, timedelta
-from pathlib import Path
-import traceback
-import os
-
 
 logger = get_logger()
 
 
-class YoutubeDownloadTask(object):
+class YoutubeProgressNotification(TypedDict):
+    filename: str
+    total_bytes: int
+    downloaded_bytes: int
+    speed: float
+
+
+class YoutubeFinishedNotification(TypedDict):
+    pass
+
+
+class YoutubeErrorNotification(TypedDict):
+    pass
+
+
+class YoutubeDownloadListener(object):
+    def _handle_youtube_notification(self, notification: Any) -> None:
+        handlers = {
+            "downloading": self._handle_youtube_progress,
+            "finished": self._handle_youtube_finished,
+            "error": self._handle_youtube_error,
+        }
+        status = notification["status"]
+        handlers[status](notification)
+
+    def _handle_youtube_progress(
+        self, notification: YoutubeProgressNotification
+    ) -> None:
+        pass
+
+    def _handle_youtube_error(self, notification: YoutubeErrorNotification) -> None:
+        pass
+
+    def _handle_youtube_finished(
+        self, notification: YoutubeFinishedNotification
+    ) -> None:
+        pass
+
+
+class YoutubeDownloadTask(DownloadTaskBase, YoutubeDownloadListener):
     supports_graceful_stop = False
 
     def __init__(
         self,
         handle: DownloadHandle,
         download_request: DownloadRequest,
+        existing_metadata: DownloadMetadata,
         work_dir: Path,
         listener: Optional[DownloadListenerBase] = None,
         progress_report_interval: Optional[timedelta] = None,
     ):
         self._handle = handle
         self._request = download_request
+        self._metadata = existing_metadata
         self._listener = listener
         self._work_dir = work_dir
-        self._metadata_sent = False
-        self._last_downloaded_byte: Optional[int] = None
-        self._downloaded_file_path: Optional[Path] = None
+        self._notified_started = False
 
-    def _progress_hook(self, progress: Dict[str, Any]) -> None:
-        status = progress["status"]
-        if status == "downloading":
-            if not self._metadata_sent:
-                self._downloaded_file_path = self._work_dir / progress["filename"]
-                self._listener.download_started(
-                    update_time=datetime.now(),
-                    handle=self._handle,
-                    metadata=DownloadMetadata(
-                        downloaded_file_path=self._downloaded_file_path,
-                        file_size=progress["total_bytes"],
-                    ),
-                )
-                self._metadata_sent = True
-            downloaded_bytes = progress["downloaded_bytes"]
-            self._listener.progress_changed(
+    def _handle_youtube_progress(
+        self, notification: YoutubeProgressNotification
+    ) -> None:
+        if not self._metadata:
+            self._metadata = DownloadMetadata(
+                downloaded_file_path=self._work_dir / notification["filename"],
+                file_size=notification["total_bytes"],
+                resumable=True,
+            )
+        if not self._notified_started:
+            self._listener.download_started(
                 update_time=datetime.now(),
                 handle=self._handle,
-                downloaded_bytes=(
-                    downloaded_bytes
-                    if not self._last_downloaded_byte
-                    else downloaded_bytes - self._last_downloaded_byte
-                ),
-                average_rate=progress["speed"],
+                metadata=self._metadata,
             )
-            self._last_downloaded_byte = downloaded_bytes
-        elif status == "finished":
-            pass
-        elif status == "error":
-            pass
+            self._notified_started = True
+        self._listener.progress_changed(
+            update_time=datetime.now(),
+            handle=self._handle,
+            downloaded_bytes=notification["downloaded_bytes"],
+            average_rate=notification["speed"],
+        )
 
     def run(self):
         try:
             ydl_options = {
                 "format": "best",
-                "progress_hooks": [self._progress_hook],
+                "progress_hooks": [self._handle_youtube_notification],
                 "logger": logger,
             }
             os.chdir(self._work_dir)
@@ -83,7 +115,6 @@ class YoutubeDownloadTask(object):
             self._listener.download_complete(
                 update_time=datetime.now(), handle=self._handle
             )
-
         except Exception as e:
             self._listener.download_errored(
                 datetime.now(),

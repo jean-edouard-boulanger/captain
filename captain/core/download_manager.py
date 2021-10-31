@@ -33,7 +33,6 @@ from .domain import (
     DownloadEntry,
     DownloadHandle,
     ErrorInfo,
-    DataRange,
     NotificationSeverity,
     GeneralNotification,
     EventType,
@@ -346,6 +345,7 @@ class DownloadManager(DownloadListenerBase):
                 self._tasks[handle] = create_download_process(
                     handle=handle,
                     download_request=entry.user_request,
+                    existing_metadata=entry.state.metadata,
                     work_dir=entry.state.work_dir,
                     listener=self._listener_bridge.make_listener(),
                 )
@@ -371,6 +371,7 @@ class DownloadManager(DownloadListenerBase):
                 self._tasks[handle] = create_download_process(
                     handle=handle,
                     download_request=entry.user_request,
+                    existing_metadata=entry.state.metadata,
                     work_dir=work_dir,
                     listener=self._listener_bridge.make_listener(),
                 )
@@ -424,24 +425,15 @@ class DownloadManager(DownloadListenerBase):
                     raise DownloadManagerError("cannot resume task")
                 entry.state.requested_status = DownloadStatus.ACTIVE
                 invariant(entry.state.metadata is not None)
-                tmp_file_path = entry.state.metadata.downloaded_file_path
-                invariant(tmp_file_path.is_file())
-                entry.state.downloaded_bytes = tmp_file_path.stat().st_size
-                download_request = entry.user_request.copy()
-                download_request.data_range = DataRange(
-                    first_byte=entry.state.downloaded_bytes
-                )
                 invariant(handle not in self._tasks)
                 self._tasks[handle] = create_download_process(
                     handle=handle,
-                    download_request=download_request,
+                    download_request=entry.user_request.copy(deep=True),
+                    existing_metadata=entry.state.metadata,
                     work_dir=entry.state.work_dir,
                     listener=self._listener_bridge.make_listener(),
                 )
                 self._tasks[handle].start()
-                logger.info(
-                    f"resuming task {handle} from byte {entry.state.downloaded_bytes}"
-                )
 
     def _handle_remove_download(self, handle: DownloadHandle, delete_file: bool):
         logger.info(
@@ -634,11 +626,10 @@ class DownloadManager(DownloadListenerBase):
         with self._download_error_handler(handle):
             invariant(self._db.has_entry(handle))
             invariant(isinstance(downloaded_bytes, int))
+            invariant(downloaded_bytes >= 0)
             with self._db.scoped_entry(handle) as entry:
                 entry.state.current_rate = average_rate
-                if entry.state.downloaded_bytes is None:
-                    entry.state.downloaded_bytes = 0
-                entry.state.downloaded_bytes += downloaded_bytes
+                entry.state.downloaded_bytes = downloaded_bytes
                 entry.state.last_update_time = update_time
                 self._update_observers(
                     EventType.PROGRESS_CHANGED,

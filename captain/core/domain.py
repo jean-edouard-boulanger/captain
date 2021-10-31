@@ -26,11 +26,6 @@ class DownloadHandle(BaseModel):
         return DownloadHandle(handle=uuid.uuid4())
 
 
-class DataRange(BaseModel):
-    first_byte: Optional[int] = None
-    last_byte: Optional[int] = None
-
-
 class HttpBasicAuthMethod(BaseModel):
     method: Literal["basic"] = "basic"
     username: str
@@ -47,7 +42,6 @@ class DownloadRequest(BaseModel):
     auth_method: Optional[
         Annotated[AuthMethodType, Field(discriminator="method")]
     ] = None
-    data_range: Optional[DataRange] = None
 
     @property
     def remote_file_name(self):
@@ -73,7 +67,7 @@ class DownloadMetadata(BaseModel):
     downloaded_file_path: Path
     file_size: Optional[int] = None
     file_type: Optional[str] = None
-    accept_ranges: Optional[bool] = None
+    resumable: Optional[bool] = None
 
 
 class DownloadState(BaseModel):
@@ -117,7 +111,7 @@ class DownloadState(BaseModel):
             self.status == DownloadStatus.ACTIVE
             and self.requested_status is None
             and self.metadata is not None
-            and self.metadata.accept_ranges
+            and self.metadata.resumable
         )
 
     @property
