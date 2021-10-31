@@ -6,7 +6,6 @@ from .domain import (
     DownloadMetadata,
     DownloadHandle,
     AuthMethodType,
-    DataRange,
     ErrorInfo,
 )
 
@@ -37,8 +36,8 @@ def _get_next_chunk(download_iter):
         return None
 
 
-def _make_range_header(rng: DataRange):
-    return f"bytes={rng.first_byte or 0}-{rng.last_byte or str()}"
+def _make_range_header(first_byte: int = 0):
+    return f"bytes={first_byte}-"
 
 
 def _format_error(e: Exception):
@@ -109,18 +108,23 @@ class HttpDownloadTask(DownloadTaskBase):
         self,
         handle: DownloadHandle,
         download_request: DownloadRequest,
+        existing_metadata: Optional[DownloadMetadata],
         work_dir: Path,
         listener: Optional[DownloadListenerBase] = None,
         progress_report_interval: Optional[timedelta] = None,
     ):
         self._handle = handle
         self._request = download_request
+        self._metadata = existing_metadata
         self._work_dir = work_dir
         self._listener = listener or NoOpDownloadListener()
         self._stopped_flag = Event()
         self._progress_report_interval = progress_report_interval or timedelta(
             seconds=1
         )
+        self._downloaded_bytes: Optional[int] = None
+        if self._metadata and self._metadata.downloaded_file_path:
+            self._downloaded_bytes = self._metadata.downloaded_file_path.stat().st_size
 
     def _download_loop_impl(
         self, request: requests.Response, download_buffer: BinaryIO
@@ -128,8 +132,11 @@ class HttpDownloadTask(DownloadTaskBase):
         download_iter = request.iter_content(chunk_size=CHUNK_SIZE)
         progress_manager = ProgressManager()
         progress_manager.next_slice()
+        if self._downloaded_bytes is not None:
+            progress_manager.report_progress(self._downloaded_bytes)
+            progress_manager.next_slice()
+            # self._listener.progress_changed(datetime.now(), self._handle, 0, 0.0)
         next_report_cutoff = datetime.now() + self._progress_report_interval
-        self._listener.progress_changed(datetime.now(), self._handle, 0, 0.0)
         while True:
             if self._stopped_flag.is_set():
                 self._listener.download_stopped(datetime.now(), self._handle)
@@ -142,7 +149,7 @@ class HttpDownloadTask(DownloadTaskBase):
                 self._listener.progress_changed(
                     datetime.now(),
                     self._handle,
-                    progress_manager.current_bytes,
+                    progress_manager.total_bytes,
                     progress_manager.current_rate,
                 )
                 progress_manager.next_slice()
@@ -151,11 +158,9 @@ class HttpDownloadTask(DownloadTaskBase):
                 return
             download_buffer.write(next_chunk)
 
-    def _download_loop(
-        self, response: requests.Response, downloaded_file_path: Path
-    ) -> None:
+    def _download_loop(self, response: requests.Response) -> None:
         try:
-            with downloaded_file_path.open("ab") as f:
+            with self._metadata.downloaded_file_path.open("ab") as f:
                 self._download_loop_impl(response, f)
         except Exception as e:
             logger.error(f"while downloading file: {e}\n{traceback.format_exc()}")
@@ -172,28 +177,30 @@ class HttpDownloadTask(DownloadTaskBase):
         settings = self._request
         url_meta = urlparse(settings.remote_file_url)
         remote_file_name = unquote(os.path.basename(url_meta.path))
-        downloaded_file_path = self._work_dir / remote_file_name
-        download_metadata = DownloadMetadata(downloaded_file_path=downloaded_file_path)
         request_settings = {"verify": False, "stream": True, "headers": {}}
         if settings.auth_method:
             request_settings["auth"] = _make_auth(settings.auth_method)
             logger.info(request_settings["auth"])
-        if settings.data_range:
+        if self._downloaded_bytes:
             request_settings["headers"]["Range"] = _make_range_header(
-                settings.data_range
+                first_byte=self._downloaded_bytes
             )
         with requests.get(settings.remote_file_url, **request_settings) as response:
             response.raise_for_status()
             headers = response.headers
             logger.debug(f"received headers: {headers}")
             raw_file_size = headers.get("Content-Length")
-            download_metadata.file_size = int(raw_file_size) if raw_file_size else None
-            download_metadata.file_type = headers.get("Content-Type")
-            download_metadata.accept_ranges = headers.get("Accept-Ranges") == "bytes"
+            if not self._metadata:
+                self._metadata = DownloadMetadata(
+                    downloaded_file_path=self._work_dir / remote_file_name,
+                    file_size=int(raw_file_size) if raw_file_size else None,
+                    file_type=headers.get("Content-Type"),
+                    resumable=headers.get("Accept-Ranges") == "bytes",
+                )
             self._listener.download_started(
-                datetime.now(), self._handle, download_metadata
+                update_time=datetime.now(), handle=self._handle, metadata=self._metadata
             )
-            self._download_loop(response, downloaded_file_path)
+            self._download_loop(response)
 
     def run(self):
         try:

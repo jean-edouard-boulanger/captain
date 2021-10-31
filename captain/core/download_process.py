@@ -7,8 +7,9 @@ import signal
 import queue
 
 from .logging import get_logger
+from .helpers import make_kwargs
 from .download_listener import MessageBasedDownloadListener
-from .domain import DownloadHandle, DownloadRequest
+from .domain import DownloadHandle, DownloadRequest, DownloadMetadata
 from .download_task_http import HttpDownloadTask
 from .download_task_youtube import YoutubeDownloadTask
 from .download_task import DownloadTaskBase
@@ -37,6 +38,7 @@ def _download_process_entrypoint(
     message_queue: multiprocessing.Queue,
     handle: DownloadHandle,
     download_request: DownloadRequest,
+    existing_metadata: Optional[DownloadMetadata],
     work_dir: Path,
     listener: MessageBasedDownloadListener,
     progress_report_interval: Optional[timedelta],
@@ -46,6 +48,7 @@ def _download_process_entrypoint(
     download_task = task_type(
         handle=handle,
         download_request=download_request,
+        existing_metadata=existing_metadata,
         work_dir=work_dir,
         listener=listener,
         progress_report_interval=progress_report_interval,
@@ -115,6 +118,7 @@ class DownloadProcessWrapper(object):
 def create_download_process(
     handle: DownloadHandle,
     download_request: DownloadRequest,
+    existing_metadata: Optional[DownloadMetadata],
     work_dir: Path,
     listener: MessageBasedDownloadListener,
     progress_report_interval: Optional[timedelta] = None,
@@ -133,14 +137,15 @@ def create_download_process(
         download_process=multiprocessing.Process(
             target=_download_process_entrypoint,
             daemon=False,
-            args=(
-                message_queue,
-                handle,
-                download_request,
-                work_dir,
-                listener,
-                progress_report_interval,
-                task_type,
+            kwargs=make_kwargs(
+                message_queue=message_queue,
+                handle=handle,
+                download_request=download_request,
+                existing_metadata=existing_metadata,
+                work_dir=work_dir,
+                listener=listener,
+                progress_report_interval=progress_report_interval,
+                task_type=task_type,
             ),
         ),
     )
