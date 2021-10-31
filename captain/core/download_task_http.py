@@ -135,7 +135,6 @@ class HttpDownloadTask(DownloadTaskBase):
         if self._downloaded_bytes is not None:
             progress_manager.report_progress(self._downloaded_bytes)
             progress_manager.next_slice()
-            # self._listener.progress_changed(datetime.now(), self._handle, 0, 0.0)
         next_report_cutoff = datetime.now() + self._progress_report_interval
         while True:
             if self._stopped_flag.is_set():
