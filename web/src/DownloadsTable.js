@@ -187,10 +187,10 @@ export function DownloadsTable(props) {
               <TableRow key={payload.handle}>
                 <TableCell>{payload.file_name}</TableCell>
                 <TableCell>
-                  {(downloadStatus === "SCHEDULED" && payload.start_time !== null) &&
-                    `Will start on ${format_date(new Date(payload.start_time), 'MM/dd/yyyy hh:mm a')}`
+                  {(downloadStatus === "SCHEDULED" && payload.time_scheduled !== null) &&
+                    `Will start on ${format_date(new Date(payload.time_scheduled), 'MM/dd/yyyy hh:mm a')}`
                   }
-                  {(payload.progress !== null) &&
+                  {(payload.progress_pc !== null) &&
                     <LinearProgress variant="determinate"
                                     value={payload.progress_pc * 100} />
                   }

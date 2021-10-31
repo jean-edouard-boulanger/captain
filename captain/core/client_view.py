@@ -53,7 +53,7 @@ class DownloadEntry(BaseModel):
     is_final: bool
     progress_pc: Optional[float]
     current_rate: Optional[float]
-    start_time: Optional[datetime]
+    time_scheduled: Optional[datetime]
     error_message: Optional[str]
     valid_actions: List[str]
 
@@ -66,7 +66,7 @@ class DownloadEntry(BaseModel):
             is_final=entry.state.is_final,
             progress_pc=_get_download_progress_pc(entry.state),
             current_rate=entry.state.current_rate,
-            start_time=entry.state.start_time,
+            time_scheduled=entry.user_request.start_at,
             error_message=_get_error_message(entry.state),
             valid_actions=_get_valid_actions(entry.state),
         )
