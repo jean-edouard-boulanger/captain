@@ -95,13 +95,13 @@ def build_recap(manager: DownloadManager):
 
 @sio.on("start_download")
 async def on_start_download(_, data):
-    logger.info(f"start download: {data}")
     download_request = DownloadRequest.parse_obj(data)
+    logger.info(f"start download: {download_request}")
     get_manager().start_download(download_request)
 
 
 @sio.on("reschedule_download")
-async def on_start_download(_, data):
+async def on_reschedule_download(_, data):
     logger.info(f"reschedule download: {data}")
     get_manager().reschedule_download(
         handle=DownloadHandle(handle=data["handle"]),
@@ -110,7 +110,7 @@ async def on_start_download(_, data):
 
 
 @sio.on("pause_download")
-async def on_start_download(_, data):
+async def on_pause_download(_, data):
     logger.info(f"pause download: {data}")
     handle = DownloadHandle(handle=data["handle"])
     get_manager().pause_download(handle)
@@ -124,21 +124,21 @@ async def on_start_download(_, data):
 
 
 @sio.on("stop_download")
-async def on_start_download(_, data):
+async def on_stop_download(_, data):
     logger.info(f"stop download: {data}")
     handle = DownloadHandle(handle=data["handle"])
     get_manager().stop_download(handle)
 
 
 @sio.on("retry_download")
-async def on_start_download(_, data):
+async def on_retry_download(_, data):
     logger.info(f"retry download: {data}")
     handle = DownloadHandle(handle=data["handle"])
     get_manager().retry_download(handle)
 
 
 @sio.on("remove_download")
-async def on_start_download(_, data):
+async def on_remove_download(_, data):
     logger.info(f"remove download: {data}")
     manager = get_manager()
     manager.remove_download(

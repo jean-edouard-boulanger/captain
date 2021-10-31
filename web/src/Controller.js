@@ -79,9 +79,10 @@ export function makeController({endpoint, socket}) {
         {
           return null;
         }
-        let auth = {};
-        auth[download.authMode] = download.credentials;
-        return auth;
+        return {
+          method: download.authMode.toLowerCase(),
+          ...download.credentials
+        };
       };
       const makeStartAt = () => {
         if(data.schedule === null) {
@@ -93,7 +94,7 @@ export function makeController({endpoint, socket}) {
         remote_file_url: download.remoteFileUrl,
         download_dir: download.downloadDir,
         start_at: makeStartAt(),
-        auth_payload: makeAuth()
+        auth_method: makeAuth()
       });
     },
     validateDirectory: (directory) => {

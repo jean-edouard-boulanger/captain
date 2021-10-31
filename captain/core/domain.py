@@ -1,4 +1,4 @@
-from typing import Any, Optional
+from typing import Any, Optional, Literal, Union, Annotated
 from urllib.parse import unquote
 from datetime import datetime
 from pathlib import Path
@@ -6,7 +6,7 @@ import uuid
 import enum
 import os
 
-from pydantic import BaseModel
+from pydantic import BaseModel, SecretStr, Field
 
 
 class DownloadHandle(BaseModel):
@@ -31,11 +31,22 @@ class DataRange(BaseModel):
     last_byte: Optional[int] = None
 
 
+class HttpBasicAuthMethod(BaseModel):
+    method: Literal["basic"] = "basic"
+    username: str
+    password: SecretStr
+
+
+AuthMethodType = Union[HttpBasicAuthMethod]
+
+
 class DownloadRequest(BaseModel):
     remote_file_url: str
     download_dir: Path
     start_at: Optional[datetime] = None
-    auth_payload: Optional[Any] = None
+    auth_method: Optional[
+        Annotated[AuthMethodType, Field(discriminator="method")]
+    ] = None
     data_range: Optional[DataRange] = None
 
     @property

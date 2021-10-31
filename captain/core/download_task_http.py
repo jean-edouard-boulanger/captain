@@ -5,6 +5,7 @@ from .domain import (
     DownloadRequest,
     DownloadMetadata,
     DownloadHandle,
+    AuthMethodType,
     DataRange,
     ErrorInfo,
 )
@@ -13,7 +14,7 @@ from requests.auth import HTTPBasicAuth, HTTPProxyAuth, HTTPDigestAuth
 import requests.exceptions
 import requests
 
-from typing import Optional, List, Union, Dict, Any, BinaryIO
+from typing import Optional, List, Union, BinaryIO
 from dataclasses import dataclass
 from urllib.parse import urlparse, unquote
 from threading import Event
@@ -54,23 +55,16 @@ def _format_error(e: Exception):
     return default_error
 
 
-AuthMethod = Union[HTTPBasicAuth, HTTPProxyAuth, HTTPDigestAuth]
+HttpAuthMethodType = Union[HTTPBasicAuth, HTTPProxyAuth, HTTPDigestAuth]
 
 
-def _parse_auth_payload(data: Optional[Dict[str, Any]]) -> Optional[AuthMethod]:
-    if data is None:
-        return None
-    if "basic" in data:
-        data = data["basic"]
-        return HTTPBasicAuth(data["username"], data["password"])
-    if "proxy" in data:
-        data = data["proxy"]
-        return HTTPProxyAuth(data["username"], data["password"])
-    if "digest" in data:
-        data = data["digest"]
-        return HTTPDigestAuth(data["username"], data["password"])
+def _make_auth(auth_method: AuthMethodType) -> Optional[HttpAuthMethodType]:
+    if auth_method.method == "basic":
+        return HTTPBasicAuth(
+            auth_method.username, auth_method.password.get_secret_value()
+        )
     raise ValueError(
-        f"'{list(data.keys())[0]}' is not a supported authentication strategy"
+        f"'{type(auth_method).__name__}' is not a supported authentication strategy"
     )
 
 
@@ -181,8 +175,9 @@ class HttpDownloadTask(DownloadTaskBase):
         downloaded_file_path = self._work_dir / remote_file_name
         download_metadata = DownloadMetadata(downloaded_file_path=downloaded_file_path)
         request_settings = {"verify": False, "stream": True, "headers": {}}
-        if settings.auth_payload:
-            request_settings["auth"] = _parse_auth_payload(settings.auth_payload)
+        if settings.auth_method:
+            request_settings["auth"] = _make_auth(settings.auth_method)
+            logger.info(request_settings["auth"])
         if settings.data_range:
             request_settings["headers"]["Range"] = _make_range_header(
                 settings.data_range
