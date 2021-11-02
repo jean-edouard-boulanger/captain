@@ -84,6 +84,21 @@ export function makeController({endpoint, socket}) {
           ...download.credentials
         };
       };
+      const makeDownloadMethod = () => {
+        if(download.remoteFileUrl.includes("youtube.")) {
+          return {
+            method: "youtube",
+            remote_file_url: download.remoteFileUrl
+          }
+        }
+        else {
+          return {
+            method: "http",
+            remote_file_url: download.remoteFileUrl,
+            auth_method: makeAuth()
+          }
+        }
+      }
       const makeStartAt = () => {
         if(data.schedule === null) {
           return null;
@@ -91,10 +106,9 @@ export function makeController({endpoint, socket}) {
         return data.schedule.toISOString()
       };
       socket.emit("start_download", {
-        remote_file_url: download.remoteFileUrl,
         download_dir: download.downloadDir,
         start_at: makeStartAt(),
-        auth_method: makeAuth()
+        download_method: makeDownloadMethod()
       });
     },
     validateDirectory: (directory) => {

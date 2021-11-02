@@ -56,6 +56,7 @@ class DownloadEntry(BaseModel):
     time_scheduled: Optional[datetime]
     error_message: Optional[str]
     valid_actions: List[str]
+    download_method: str
 
     @staticmethod
     def from_internal(entry: InternalDownloadEntry) -> "DownloadEntry":
@@ -69,4 +70,5 @@ class DownloadEntry(BaseModel):
             time_scheduled=entry.user_request.start_at,
             error_message=_get_error_message(entry.state),
             valid_actions=_get_valid_actions(entry.state),
+            download_method=entry.user_request.download_method.method,
         )

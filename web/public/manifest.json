@@ -8,14 +8,19 @@
       "type": "image/x-icon"
     },
     {
-      "src": "logo192.png",
+      "src": "youtube-logo32",
       "type": "image/png",
-      "sizes": "192x192"
+      "sizes": "32x23"
     },
     {
-      "src": "logo512.png",
+      "src": "youtube-logo64",
       "type": "image/png",
-      "sizes": "512x512"
+      "sizes": "32x23"
+    },
+    {
+      "src": "youtube-logo128",
+      "type": "image/png",
+      "sizes": "128x92"
     }
   ],
   "start_url": ".",

@@ -7,12 +7,17 @@ def make_kwargs(**kwargs: Any) -> dict[str, Any]:
 
 
 if platform.system() == "Linux":
+
     def set_thread_name(name: str):
         try:
             import pyprctl
+
             pyprctl.set_name(name)
         except Exception:
             pass
+
+
 else:
+
     def set_thread_name(name: str):
         pass

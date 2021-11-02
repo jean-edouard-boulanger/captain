@@ -11,7 +11,7 @@ from .errors import NotSupportedError
 from .download_listener import DownloadListenerBase
 from .download_task import DownloadTaskBase
 from .domain import (
-    DownloadRequest,
+    YoutubeDownloadRequest,
     DownloadMetadata,
     DownloadHandle,
     ErrorInfo,
@@ -66,7 +66,7 @@ class YoutubeDownloadTask(DownloadTaskBase, YoutubeDownloadListener):
     def __init__(
         self,
         handle: DownloadHandle,
-        download_request: DownloadRequest,
+        download_request: YoutubeDownloadRequest,
         existing_metadata: DownloadMetadata,
         work_dir: Path,
         listener: Optional[DownloadListenerBase] = None,

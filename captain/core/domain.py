@@ -32,20 +32,47 @@ class HttpBasicAuthMethod(BaseModel):
     password: SecretStr
 
 
-AuthMethodType = Union[HttpBasicAuthMethod]
+HttpAuthMethodType = Union[HttpBasicAuthMethod]
+HttpAuthMethodChoiceType = Annotated[HttpAuthMethodType, Field(discriminator="method")]
+
+
+class HttpDownloadRequest(BaseModel):
+    method: Literal["http"] = "http"
+    remote_file_url: str
+    auth_method: Optional[HttpAuthMethodChoiceType] = None
+
+    @property
+    def remote_file_name(self) -> str:
+        return unquote(os.path.basename(self.remote_file_url))
+
+
+class YoutubeAuth(BaseModel):
+    username: str
+    password: SecretStr
+
+
+class YoutubeDownloadRequest(BaseModel):
+    method: Literal["youtube"] = "youtube"
+    remote_file_url: str
+    auth: Optional[YoutubeAuth] = None
+
+    @property
+    def remote_file_name(self) -> str:
+        return unquote(os.path.basename(self.remote_file_url))
+
+
+DownloadMethodType = Union[HttpDownloadRequest, YoutubeDownloadRequest]
+DownloadMethodChoiceType = Annotated[DownloadMethodType, Field(discriminator="method")]
 
 
 class DownloadRequest(BaseModel):
-    remote_file_url: str
     download_dir: Path
     start_at: Optional[datetime] = None
-    auth_method: Optional[
-        Annotated[AuthMethodType, Field(discriminator="method")]
-    ] = None
+    download_method: DownloadMethodChoiceType
 
     @property
-    def remote_file_name(self):
-        return unquote(os.path.basename(self.remote_file_url))
+    def remote_file_name(self) -> str:
+        return self.download_method.remote_file_name
 
 
 class ErrorInfo(BaseModel):
