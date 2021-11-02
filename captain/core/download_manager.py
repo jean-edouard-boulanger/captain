@@ -396,7 +396,9 @@ class DownloadManager(DownloadListenerBase):
                         in {DownloadStatus.PAUSED, DownloadStatus.SCHEDULED}
                     )
                     entry.state.requested_status = DownloadStatus.STOPPED
-                    self._handle_download_stopped(datetime.now(), handle)
+                    self._queue_request(
+                        self._handle_download_stopped, args=(datetime.now(), handle)
+                    )
                     return
                 task.stop()
                 entry.state.requested_status = DownloadStatus.STOPPED
