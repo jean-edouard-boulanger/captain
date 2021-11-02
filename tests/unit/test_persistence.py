@@ -8,7 +8,7 @@ from captain.core.domain import (
     DownloadRequest,
     DownloadState,
     DownloadEntry,
-    HttpDownloadRequest
+    HttpDownloadRequest,
 )
 from captain.core.persistence_sqlite import SQLitePersistence
 from captain.core.persistence_in_memory import InMemoryPersistence
@@ -23,7 +23,7 @@ def create_dummy_download_entry() -> DownloadEntry:
             download_dir=Path("/Downloads"),
             download_method=HttpDownloadRequest(
                 remote_file_url="http://www.dummy.com/image.png"
-            )
+            ),
         ),
         state=DownloadState(status=DownloadStatus.ACTIVE, work_dir=Path("/tmp")),
     )

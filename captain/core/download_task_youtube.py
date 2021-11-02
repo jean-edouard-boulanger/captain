@@ -4,7 +4,7 @@ from pathlib import Path
 import traceback
 import os
 
-import youtube_dl
+import yt_dlp
 
 from .logging import get_logger
 from .errors import NotSupportedError
@@ -110,7 +110,7 @@ class YoutubeDownloadTask(DownloadTaskBase, YoutubeDownloadListener):
                 "logger": logger,
             }
             os.chdir(self._work_dir)
-            with youtube_dl.YoutubeDL(ydl_options) as ydl:
+            with yt_dlp.YoutubeDL(ydl_options) as ydl:
                 ydl.download([self._request.remote_file_url])
             self._listener.download_complete(
                 update_time=datetime.now(), handle=self._handle
