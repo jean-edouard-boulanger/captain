@@ -170,6 +170,7 @@ export function DownloadsTable(props) {
       <Table aria-label='simple-table'>
         <TableHead>
           <TableRow>
+            <TableCell>&nbsp;</TableCell>
             <TableCell>File name</TableCell>
             <TableCell style={{minWidth: 200}}>Progress</TableCell>
             <TableCell style={{minWidth: 100}}>&nbsp;</TableCell>
@@ -185,7 +186,19 @@ export function DownloadsTable(props) {
             const downloadStatus = payload.status;
             return (
               <TableRow key={payload.handle}>
-                <TableCell>{payload.file_name}</TableCell>
+                <TableCell width={34}>
+                  {(payload.download_method === "youtube") &&
+                    <img src="youtube-logo64.png" width={34} alt="youtube" />
+                  }
+                </TableCell>
+                <TableCell style={{
+                  "text-overflow": "ellipsis",
+                  "max-width": "200px",
+                  "white-space": "nowrap",
+                  "overflow": "hidden"
+                }}>
+                  {payload.file_name}
+                </TableCell>
                 <TableCell>
                   {(downloadStatus === "SCHEDULED" && payload.time_scheduled !== null) &&
                     `Will start on ${format_date(new Date(payload.time_scheduled), 'MM/dd/yyyy hh:mm a')}`

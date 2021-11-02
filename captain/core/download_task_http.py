@@ -2,10 +2,10 @@ from .logging import get_logger
 from .download_task import DownloadTaskBase
 from .download_listener import DownloadListenerBase, NoOpDownloadListener
 from .domain import (
-    DownloadRequest,
+    HttpDownloadRequest,
+    HttpAuthMethodType,
     DownloadMetadata,
     DownloadHandle,
-    AuthMethodType,
     ErrorInfo,
 )
 
@@ -54,10 +54,10 @@ def _format_error(e: Exception):
     return default_error
 
 
-HttpAuthMethodType = Union[HTTPBasicAuth, HTTPProxyAuth, HTTPDigestAuth]
+HTTPAuthMethodImplType = Union[HTTPBasicAuth, HTTPProxyAuth, HTTPDigestAuth]
 
 
-def _make_auth(auth_method: AuthMethodType) -> Optional[HttpAuthMethodType]:
+def _make_auth(auth_method: HttpAuthMethodType) -> HTTPAuthMethodImplType:
     if auth_method.method == "basic":
         return HTTPBasicAuth(
             auth_method.username, auth_method.password.get_secret_value()
@@ -107,7 +107,7 @@ class HttpDownloadTask(DownloadTaskBase):
     def __init__(
         self,
         handle: DownloadHandle,
-        download_request: DownloadRequest,
+        download_request: HttpDownloadRequest,
         existing_metadata: Optional[DownloadMetadata],
         work_dir: Path,
         listener: Optional[DownloadListenerBase] = None,

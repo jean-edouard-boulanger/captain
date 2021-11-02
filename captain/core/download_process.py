@@ -1,4 +1,4 @@
-from typing import Optional, Type
+from typing import Optional, Type, Union
 from datetime import timedelta, datetime
 from pathlib import Path
 import multiprocessing
@@ -49,7 +49,7 @@ def _download_process_entrypoint(
     signal.signal(signal.SIGINT, signal.SIG_IGN)
     download_task = task_type(
         handle=handle,
-        download_request=download_request,
+        download_request=download_request.download_method,
         existing_metadata=existing_metadata,
         work_dir=work_dir,
         listener=listener,
@@ -118,6 +118,18 @@ class DownloadProcessWrapper(object):
         self._process.join()
 
 
+DownloadTaskType = Union[HttpDownloadTask, YoutubeDownloadTask]
+
+
+def get_download_task_type(download_request: DownloadRequest) -> Type[DownloadTaskType]:
+    tasks_mapping = {"http": HttpDownloadTask, "youtube": YoutubeDownloadTask}
+    download_method = download_request.download_method.method
+    task_type = tasks_mapping.get(download_method)
+    if not task_type:
+        raise ValueError(f"unsupported task type: {download_method}")
+    return task_type
+
+
 def create_download_process(
     handle: DownloadHandle,
     download_request: DownloadRequest,
@@ -126,12 +138,15 @@ def create_download_process(
     listener: MessageBasedDownloadListener,
     progress_report_interval: Optional[timedelta] = None,
 ) -> DownloadProcessWrapper:
-    message_queue = multiprocessing.Queue()
-    task_type = (
-        YoutubeDownloadTask
-        if "youtube.com" in download_request.remote_file_url
-        else HttpDownloadTask
+    logger.info(
+        "creating download process for"
+        f" handle={handle}"
+        f" download_request={download_request}"
+        f" existing_metadata={existing_metadata}"
+        f" work_dir={work_dir}"
     )
+    message_queue = multiprocessing.Queue()
+    task_type = get_download_task_type(download_request)
     return DownloadProcessWrapper(
         handle=handle,
         message_queue=message_queue,

@@ -58,10 +58,11 @@ def init_manager(settings: DownloadManagerSettings) -> DownloadManager:
     def manager_thread_endpoint() -> None:
         set_thread_name(MANAGER_THREAD_NAME)
         get_manager().run()
+
     get_manager.manager = DownloadManager(settings)
     get_manager.manager_thread = threading.Thread(
-        target=manager_thread_endpoint,
-        name=MANAGER_THREAD_NAME)
+        target=manager_thread_endpoint, name=MANAGER_THREAD_NAME
+    )
     return get_manager.manager
 
 
