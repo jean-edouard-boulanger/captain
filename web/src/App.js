@@ -20,7 +20,7 @@ import { DownloadsTable } from "./DownloadsTable";
 import { NotConnected } from "./NotConnected";
 
 import { getServerEndpoint } from './endpoint';
-import { makeController } from "./Controller";
+import { Controller } from "./Controller";
 
 import './App.css';
 
@@ -54,7 +54,7 @@ function App() {
   useEffect(() => {
     const newSocket = socketIOClient(endpoint);
     setSocket(newSocket);
-    setController(makeController({ endpoint, socket: newSocket }))
+    setController(new Controller(endpoint, newSocket));
   }, [endpoint]);
 
   useEffect(() => {

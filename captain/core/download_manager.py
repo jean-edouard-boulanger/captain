@@ -189,6 +189,12 @@ class DownloadManager(DownloadListenerBase):
         )
 
     @public_endpoint
+    def get_download_file_path(self, handle: DownloadHandle, blocking: Optional[bool] = False):
+        return self._queue_request(
+            self._handle_get_download_file_path, args=(handle,), blocking=blocking
+        )
+
+    @public_endpoint
     def get_downloads(self, blocking: Optional[bool] = False):
         return self._queue_request(self._handle_get_downloads, blocking=blocking)
 
@@ -473,6 +479,16 @@ class DownloadManager(DownloadListenerBase):
         return serialize(
             ExternalDownloadEntry.from_internal(self._db.get_entry(handle))
         )
+
+    def _handle_get_download_file_path(self, handle: DownloadHandle) -> Path:
+        logger.info(f"handling get download file path request handle={handle}")
+        if not self._db.has_entry(handle):
+            raise DownloadManagerError(f"download entry not found: {handle.handle}")
+        entry = self._db.get_entry(handle)
+        if not entry.state.can_be_downloaded:
+            raise DownloadManagerError(f"download file not available")
+        invariant(entry.state.file_location is not None)
+        return entry.state.file_location
 
     def _handle_get_downloads(self) -> List[Dict[str, Any]]:
         logger.info(f"handling get downloads request")

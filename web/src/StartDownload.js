@@ -66,7 +66,7 @@ export function StartDownload({onStart, onCancel, settings, controller}) {
       errors.downloadDir = true;
     }
     if(!isBlank(data.downloadDir)) {
-      const {valid, reason} = await controller.validateDirectory(data.downloadDir);
+      const {valid, reason} = await controller.validateDownloadDirectory(data.downloadDir);
       if(!valid) {
         errors.downloadDir = reason;
       }

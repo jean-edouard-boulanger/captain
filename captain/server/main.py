@@ -8,7 +8,6 @@ from captain.core import (
     DownloadRequest,
     DownloadManagerEvent,
     DownloadHandle,
-    SocketioRpc,
 )
 
 import yaml
@@ -19,7 +18,7 @@ from pathlib import Path
 from typing import Callable
 from asyncio import Queue
 from aiohttp import web
-import aiohttp
+import aiohttp_cors
 import logging
 import argparse
 import threading
@@ -30,8 +29,7 @@ import os
 
 
 sio = socketio.AsyncServer(async_mode="aiohttp", cors_allowed_origins="*")
-rpc = SocketioRpc(sio)
-app = web.Application()
+routes = web.RouteTableDef()
 
 logging.basicConfig(
     stream=sys.stdout,
@@ -165,38 +163,33 @@ async def connect(sid, _):
     await sio.emit("recap", build_recap(get_manager()))
 
 
-@rpc.on("validate_download_directory")
-def handle_validate_download_directory(_, request):
-    directory = Path(request["directory"]).expanduser()
-    if not directory.is_dir():
-        return {"valid": False, "reason": "Does not exist or is not a directory"}
-    if not os.access(directory, os.W_OK):
-        return {"valid": False, "reason": "This directory is not writable"}
-    return {"valid": True}
-
-
-@aiohttp.streamer
-async def file_sender(writer, file_path=None):
-    with open(file_path, "rb") as f:
-        chunk = f.read(2 ** 16)
-        while chunk:
-            await writer.write(chunk)
-            chunk = f.read(2 ** 16)
-
-
-async def download_handler(request):
+@routes.get("/download/{handle}")
+async def download_endpoint(request):
     handle = DownloadHandle(handle=request.match_info["handle"])
-    entry = get_manager().get_download(handle=handle, blocking=True)
-    download_status = entry["state"]["status"]
-    logger.info(entry["state"])
-    if entry["state"]["status"] != "COMPLETE" or not entry["state"]["file_location"]:
-        return web.Response(
-            body=f"file for download '{handle.handle}' cannot be downloaded (download status: {download_status})",
-            status=404,
-        )
-    file_path = Path(entry["state"]["file_location"])
-    headers = {"Content-disposition": f"attachment; filename={file_path.name}"}
-    return web.Response(body=file_sender(file_path=file_path), headers=headers)
+    file_path: Path = get_manager().get_download_file_path(handle=handle, blocking=True)
+    response = web.StreamResponse(
+        status=200,
+        reason="OK",
+        headers={
+            "Content-disposition": f"attachment; filename={file_path.name}"
+        }
+    )
+    await response.prepare(request)
+    with file_path.open("rb") as f:
+        while chunk := f.read(2 ** 16):
+            await response.write(chunk)
+    return response
+
+
+@routes.post("/api/v1/core/validate_download_directory")
+async def validate_download_directory_endpoint(request: web.Request):
+    payload = await request.json()
+    directory = Path(payload["directory"]).expanduser()
+    if not directory.is_dir():
+        return web.json_response({"valid": False, "reason": "Does not exist or is not a directory"})
+    if not os.access(directory, os.W_OK):
+        return web.json_response({"valid": False, "reason": "This directory is not writable"})
+    return web.json_response({"valid": True})
 
 
 def get_arguments_parser():
@@ -209,10 +202,7 @@ def get_arguments_parser():
 
 def signal_handler(*args, **kwargs):
     stop_manager()
-    logger.info("download manager stopped")
-    signal.raise_signal(
-        signal.SIGKILL
-    )  # TODO: there is probably a better way to stop the web server gracefully
+    signal.raise_signal(signal.SIGKILL)
 
 
 signal.signal(signal.SIGINT, signal_handler)
@@ -223,8 +213,6 @@ def main():
     config = get_arguments_parser().parse_args()
     with open(config.config) as cf:
         manager_settings = DownloadManagerSettings.parse_obj(yaml.safe_load(cf))
-    logging_settings = manager_settings.logging_settings
-    # configure_logging(logging_settings.format, logging_settings.level)
     shared_queue = Queue()
     manager = init_manager(manager_settings)
     manager.add_observer(
@@ -232,7 +220,17 @@ def main():
     )
     start_manager()
     logger.info("download manager started")
-    app.router.add_get("/download/{handle}", download_handler)
+    app = web.Application()
+    cors = aiohttp_cors.setup(app, defaults={
+        "*": aiohttp_cors.ResourceOptions(
+            allow_credentials=True,
+            expose_headers="*",
+            allow_headers="*",
+        )
+    })
+    app.add_routes(routes)
+    for route in list(app.router.routes()):
+        cors.add(route)
     sio.attach(app)
     sio.start_background_task(sio_publisher, shared_queue, sio.emit)
     logger.info("publisher started")
