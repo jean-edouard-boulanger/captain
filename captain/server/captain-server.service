@@ -1,14 +1,15 @@
 [Unit]
-Description=Captain backend
+Description=Captain download manager (backend)
 After=network.target
 StartLimitIntervalSec=0
 
 [Service]
+WorkingDirectory=/usr/local/bin/captain/server/
 Type=simple
 Restart=always
 RestartSec=1
 User=captain
-ExecStart=/usr/local/bin/python3.9 -m captain.server.main -c /etc/captain/config.yml
+ExecStart=/usr/local/bin/captain/server/venv/bin/python -m captain.server.main -c /etc/captain/config.yml
 
 [Install]
-WantedBy=multi-user.target
+WantedBy=captain-web.service

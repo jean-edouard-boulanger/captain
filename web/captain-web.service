@@ -1,14 +1,15 @@
 [Unit]
-Description=Captain web application
+Description=Captain download manager (web application)
 After=network.target
 StartLimitIntervalSec=0
 
 [Service]
+WorkingDirectory=/usr/local/bin/captain/web/
 Type=simple
 Restart=always
 RestartSec=1
 User=captain
-ExecStart=/usr/local/bin/serve -l 4000 -s /usr/local/bin/captain/web/build/
+ExecStart=/usr/local/bin/captain/web/run-prod.sh
 
 [Install]
-WantedBy=multi-user.target
+WantedBy=captain.service
