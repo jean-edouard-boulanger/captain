@@ -13,4 +13,3 @@ from .domain import (
     DownloadRequest,
     DownloadHandle,
 )
-from .socketio_rpc import SocketioRpc
