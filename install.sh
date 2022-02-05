@@ -13,7 +13,7 @@ id -u ${captain_user} >/dev/null 2>&1 || useradd -d /home/${captain_user} -g ${c
 
 set +e
 echo "stopping running captain services (if running)"
-systemctl stop captain >/dev/null 2>&1
+systemctl stop 'captain*' >/dev/null 2>&1
 set -e
 
 captain_dir=/usr/local/bin/captain
@@ -52,3 +52,4 @@ cp captain.service /etc/systemd/system
 systemctl daemon-reload
 systemctl enable captain captain-web captain-server
 systemctl start captain
+systemctl status 'captain*'
