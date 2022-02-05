@@ -23,7 +23,6 @@ import logging
 import argparse
 import threading
 import asyncio
-import signal
 import sys
 import os
 
@@ -77,6 +76,10 @@ get_manager.manager = None
 get_manager.manager_thread = None
 
 
+async def _queue_put_nowait(queue, event):
+    await queue.put(event)
+
+
 class DownloadManagerEventConsumer(DownloadManagerObserverBase):
     def __init__(self, queue: Queue, event_loop):
         self._queue = queue
@@ -84,16 +87,30 @@ class DownloadManagerEventConsumer(DownloadManagerObserverBase):
 
     def handle_event(self, event: DownloadManagerEvent):
         if self._loop.is_closed():
-            logger.warning("event loop is closed, not ignoring download manager event")
+            logger.warning("event loop is closed, ignoring download manager event")
             return
-        self._loop.call_soon_threadsafe(self._queue.put_nowait, event)
+        asyncio.run_coroutine_threadsafe(self._queue.put(event), self._loop)
 
 
-async def sio_publisher(shared_queue: Queue, emit: Callable):
-    logger.info(f"subscriber started")
-    while True:
-        event: DownloadManagerEvent = await shared_queue.get()
-        await emit("download_event", serialize(event))
+async def sio_publisher(event_queue: Queue, emit: Callable):
+    try:
+        logger.info("socket.io pub/sub task started")
+        while True:
+            event: DownloadManagerEvent = await event_queue.get()
+            await emit("download_event", serialize(event))
+    except asyncio.CancelledError:
+        logger.info("socket.io pub/sub task cancelled")
+        raise
+
+
+async def start_sio_publisher(app: web.Application):
+    logger.info("starting socket.io pub/sub task")
+    app["sio_publisher"] = asyncio.create_task(sio_publisher(app["event_queue"], sio.emit))
+
+
+async def stop_sio_publisher(app: web.Application):
+    logger.info("cancelling socket.io pub/sub task")
+    app["sio_publisher"].cancel()
 
 
 def build_recap(manager: DownloadManager):
@@ -200,27 +217,26 @@ def get_arguments_parser():
     return parser
 
 
-def signal_handler(*args, **kwargs):
-    stop_manager()
-    signal.raise_signal(signal.SIGKILL)
-
-
-signal.signal(signal.SIGINT, signal_handler)
-signal.signal(signal.SIGTERM, signal_handler)
+def shutdown_web_server():
+    logger.info("shutting down web application")
+    raise web.GracefulExit()
 
 
 def main():
     config = get_arguments_parser().parse_args()
     with open(config.config) as cf:
         manager_settings = DownloadManagerSettings.parse_obj(yaml.safe_load(cf))
-    shared_queue = Queue()
+    event_loop = asyncio.get_event_loop()
+    event_queue = Queue()
     manager = init_manager(manager_settings)
     manager.add_observer(
-        DownloadManagerEventConsumer(shared_queue, asyncio.get_event_loop())
+        DownloadManagerEventConsumer(event_queue, event_loop)
     )
     start_manager()
     logger.info("download manager started")
     app = web.Application()
+    app["event_queue"] = event_queue
+    app.on_startup.append(start_sio_publisher)
     cors = aiohttp_cors.setup(app, defaults={
         "*": aiohttp_cors.ResourceOptions(
             allow_credentials=True,
@@ -232,15 +248,14 @@ def main():
     for route in list(app.router.routes()):
         cors.add(route)
     sio.attach(app)
-    sio.start_background_task(sio_publisher, shared_queue, sio.emit)
-    logger.info("publisher started")
     web.run_app(
         app,
         host=manager_settings.listen_host,
         port=manager_settings.listen_port,
         access_log=None,
-        handle_signals=False,
+        loop=event_loop
     )
+    logger.info("web application stopped")
     logger.info("stopping download manager")
     stop_manager()
     logger.info("leaving")
