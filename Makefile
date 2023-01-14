@@ -19,5 +19,11 @@ isort:
 isort-check:
 	isort --check captain/
 
-lint: black-check isort-check
-format: black isort
+flake8:
+	flake8 captain/
+
+pyupragde:
+	git ls-files -- '*.py' | xargs pyupgrade --py311-plus
+
+lint: black-check isort-check flake8
+format: pyupragde black isort

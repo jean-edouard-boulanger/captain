@@ -1,11 +1,11 @@
 import threading
 
 
-class _Unset(object):
+class _Unset:
     pass
 
 
-class Future(object):
+class Future:
     def __init__(self):
         self._flag = threading.Event()
         self._result = _Unset()

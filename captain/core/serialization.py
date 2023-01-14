@@ -2,14 +2,14 @@ import json
 import uuid
 from datetime import date, datetime, timedelta
 from pathlib import PurePath
-from typing import Any, Optional, Union
+from typing import Any
 
 import orjson
 import pydantic
 
 
 def serialize(data: Any) -> Any:
-    def serialize_key(key: Any) -> Optional[Union[str, int, float, bool]]:
+    def serialize_key(key: Any) -> str | int | float | bool | None:
         if key is None:
             return key
         if not isinstance(key, (str, int, float, bool)):

@@ -1,9 +1,10 @@
 import queue
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime
 from queue import Queue
 from threading import Thread
-from typing import Callable, Dict, Optional, Union
+from typing import TypeAlias
 
 import pytz
 
@@ -49,7 +50,7 @@ class _Cancel:
     handle: int
 
 
-_EventType = Union[_StopScheduler, _Schedule, _Cancel]
+_EventType: TypeAlias = _StopScheduler | _Schedule | _Cancel
 
 
 @dataclass
@@ -58,10 +59,10 @@ class _Event:
     future: Future
 
 
-class Scheduler(object):
+class Scheduler:
     def __init__(self):
         self._events = Queue()
-        self._pending_actions: Dict[int, _Entry] = {}
+        self._pending_actions: dict[int, _Entry] = {}
         self._running = True
         self._last_handle = 0
 
@@ -75,17 +76,13 @@ class Scheduler(object):
                 self._handle_event(event)
             if not self._running:
                 logger.info("scheduler no longer running")
-                logger.info(
-                    f"leaving main loop with {len(self._pending_actions)} pending actions"
-                )
+                logger.info(f"leaving main loop with {len(self._pending_actions)} pending actions")
                 return
             now = _now_utc()
             cleanup_handles = []
             for handle, entry in self._pending_actions.items():
                 if entry.at <= now:
-                    logger.debug(
-                        f"pending action [{handle}] {entry} if overdue to run, running now"
-                    )
+                    logger.debug(f"pending action [{handle}] {entry} if overdue to run, running now")
                     entry.action()
                     cleanup_handles.append(handle)
             for handle in cleanup_handles:
@@ -93,10 +90,7 @@ class Scheduler(object):
                 del self._pending_actions[handle]
 
     def schedule(self, at: datetime, action: Action):
-        logger.debug(
-            f"requested to schedule action {action} at {at} "
-            f"(in {(at - _now_utc()).total_seconds()}s)"
-        )
+        logger.debug(f"requested to schedule action {action} at {at} " f"(in {(at - _now_utc()).total_seconds()}s)")
         return self._queue_event(_Schedule(_Entry(at, action))).get()
 
     def schedule_unsafe(self, at: datetime, action: Action):
@@ -112,13 +106,11 @@ class Scheduler(object):
         logger.debug("scheduler requested to stop")
         return self._queue_event(_StopScheduler()).get()
 
-    def _time_to_next_action(self) -> Optional[float]:
+    def _time_to_next_action(self) -> float | None:
         if len(self._pending_actions) == 0:
             return None
         now = _now_utc()
-        min_interval = min(
-            (entry.at - now).total_seconds() for entry in self._pending_actions.values()
-        )
+        min_interval = min((entry.at - now).total_seconds() for entry in self._pending_actions.values())
         return max(min_interval, 0)
 
     def _handle_event_impl(self, event: _Event):

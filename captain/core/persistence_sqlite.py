@@ -1,6 +1,6 @@
 import sqlite3
 from pathlib import Path
-from typing import List, Literal
+from typing import Literal
 
 import orjson
 from pydantic import BaseModel
@@ -51,7 +51,7 @@ class SQLitePersistence(PersistenceBase):
         row = cursor.fetchone()
         return DownloadEntry.parse_obj(orjson.loads(row["payload"]))
 
-    def get_all_entries(self) -> List[DownloadEntry]:
+    def get_all_entries(self) -> list[DownloadEntry]:
         cursor = self._cursor()
         cursor.execute("SELECT payload FROM download_entries")
         return [DownloadEntry.parse_obj(orjson.loads(row["payload"])) for row in cursor]

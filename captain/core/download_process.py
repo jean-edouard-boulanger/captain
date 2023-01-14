@@ -4,7 +4,7 @@ import signal
 import threading
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Optional, Type, Union
+from typing import TypeAlias
 
 from .domain import DownloadHandle, DownloadMetadata, DownloadRequest
 from .download_listener import MessageBasedDownloadListener
@@ -31,7 +31,7 @@ class _InternalDownloadThread(threading.Thread):
         self._task.stop()
 
 
-class _Stop(object):
+class _Stop:
     pass
 
 
@@ -39,11 +39,11 @@ def _download_process_entrypoint(
     message_queue: multiprocessing.Queue,
     handle: DownloadHandle,
     download_request: DownloadRequest,
-    existing_metadata: Optional[DownloadMetadata],
+    existing_metadata: DownloadMetadata | None,
     work_dir: Path,
     listener: MessageBasedDownloadListener,
-    progress_report_interval: Optional[timedelta],
-    task_type: Type,
+    progress_report_interval: timedelta | None,
+    task_type: type,
 ):
     signal.signal(signal.SIGINT, signal.SIG_IGN)
     download_task = task_type(
@@ -69,7 +69,7 @@ def _download_process_entrypoint(
             return
 
 
-class DownloadProcessWrapper(object):
+class DownloadProcessWrapper:
     def __init__(
         self,
         handle: DownloadHandle,
@@ -101,9 +101,7 @@ class DownloadProcessWrapper(object):
 
     def stop(self) -> None:
         graceful = self._supports_graceful_stop
-        logger.info(
-            f"stopping child download process pid={self.pid} handle={self._handle} graceful={graceful}"
-        )
+        logger.info(f"stopping child download process pid={self.pid} handle={self._handle} graceful={graceful}")
         if graceful and self._process.is_alive():
             self._message_queue.put(_Stop())
             return
@@ -117,10 +115,10 @@ class DownloadProcessWrapper(object):
         self._process.join()
 
 
-DownloadTaskType = Union[HttpDownloadTask, YoutubeDownloadTask]
+DownloadTaskType: TypeAlias = HttpDownloadTask | YoutubeDownloadTask
 
 
-def get_download_task_type(download_request: DownloadRequest) -> Type[DownloadTaskType]:
+def get_download_task_type(download_request: DownloadRequest) -> type[DownloadTaskType]:
     tasks_mapping = {"http": HttpDownloadTask, "youtube": YoutubeDownloadTask}
     download_method = download_request.download_method.method
     task_type = tasks_mapping.get(download_method)
@@ -132,10 +130,10 @@ def get_download_task_type(download_request: DownloadRequest) -> Type[DownloadTa
 def create_download_process(
     handle: DownloadHandle,
     download_request: DownloadRequest,
-    existing_metadata: Optional[DownloadMetadata],
+    existing_metadata: DownloadMetadata | None,
     work_dir: Path,
     listener: MessageBasedDownloadListener,
-    progress_report_interval: Optional[timedelta] = None,
+    progress_report_interval: timedelta | None = None,
 ) -> DownloadProcessWrapper:
     logger.info(
         "creating download process for"

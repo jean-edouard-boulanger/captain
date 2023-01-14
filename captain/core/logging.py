@@ -1,9 +1,8 @@
 import logging
 import logging.config
-from typing import Optional
 
 
-def configure_logging(log_format: str, log_level: Optional[str] = None) -> None:
+def configure_logging(log_format: str, log_level: str | None = None) -> None:
     logging.config.dictConfig(
         {
             "version": 1,
