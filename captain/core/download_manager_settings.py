@@ -1,6 +1,6 @@
 from datetime import timedelta
 from pathlib import Path
-from typing import Annotated, List
+from typing import Annotated
 
 from pydantic import BaseModel, Field, validator
 
@@ -34,7 +34,7 @@ class DownloadManagerSettings(BaseModel):
     listen_host: str = "0.0.0.0"
     listen_port: int = 4001
     temp_download_dir: Path = Path("/tmp")
-    download_directories: List[DownloadDirectory] = Field(default_factory=list)
+    download_directories: list[DownloadDirectory] = Field(default_factory=list)
     shutdown_timeout: timedelta = timedelta(seconds=10)
     send_files_to_trash: bool = False
     persistence_settings: Annotated[PersistenceSettingsType, Field(discriminator="persistence_type")]

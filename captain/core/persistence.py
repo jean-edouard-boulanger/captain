@@ -1,5 +1,5 @@
 from contextlib import contextmanager
-from typing import ContextManager, List, Protocol
+from typing import ContextManager, Protocol
 
 from .domain import DownloadEntry, DownloadHandle
 from .logging import get_logger
@@ -11,7 +11,7 @@ class PersistenceBase(Protocol):
     def has_entry(self, handle: DownloadHandle) -> bool:
         raise NotImplementedError("must implement 'has_entry'")
 
-    def get_all_entries(self) -> List[DownloadEntry]:
+    def get_all_entries(self) -> list[DownloadEntry]:
         raise NotImplementedError("must implement 'get_all_entries'")
 
     def get_entry(self, handle: DownloadHandle) -> DownloadEntry:

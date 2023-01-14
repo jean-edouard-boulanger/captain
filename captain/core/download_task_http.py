@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 from pathlib import Path
 from threading import Event
-from typing import BinaryIO, List, Optional, Union
+from typing import BinaryIO, TypeAlias
 from urllib.parse import unquote, urlparse
 
 import requests
@@ -53,7 +53,7 @@ def _format_error(e: Exception):
     return default_error
 
 
-HTTPAuthMethodImplType = Union[HTTPBasicAuth, HTTPProxyAuth, HTTPDigestAuth]
+HTTPAuthMethodImplType: TypeAlias = HTTPBasicAuth | HTTPProxyAuth | HTTPDigestAuth
 
 
 def _make_auth(auth_method: HttpAuthMethodType) -> HTTPAuthMethodImplType:
@@ -65,13 +65,13 @@ def _make_auth(auth_method: HttpAuthMethodType) -> HTTPAuthMethodImplType:
 @dataclass
 class ProgressSlice:
     start_time: datetime
-    end_time: Optional[datetime] = None
+    end_time: datetime | None = None
     total_bytes: int = 0
 
 
-class ProgressManager(object):
+class ProgressManager:
     def __init__(self):
-        self.progress: List[ProgressSlice] = []
+        self.progress: list[ProgressSlice] = []
 
     def report_progress(self, total_bytes: float):
         self.progress[-1].total_bytes += total_bytes
@@ -103,10 +103,10 @@ class HttpDownloadTask(DownloadTaskBase):
         self,
         handle: DownloadHandle,
         download_request: HttpDownloadRequest,
-        existing_metadata: Optional[DownloadMetadata],
+        existing_metadata: DownloadMetadata | None,
         work_dir: Path,
-        listener: Optional[DownloadListenerBase] = None,
-        progress_report_interval: Optional[timedelta] = None,
+        listener: DownloadListenerBase | None = None,
+        progress_report_interval: timedelta | None = None,
     ):
         self._handle = handle
         self._request = download_request
@@ -115,7 +115,7 @@ class HttpDownloadTask(DownloadTaskBase):
         self._listener = listener or NoOpDownloadListener()
         self._stopped_flag = Event()
         self._progress_report_interval = progress_report_interval or timedelta(seconds=1)
-        self._downloaded_bytes: Optional[int] = None
+        self._downloaded_bytes: int | None = None
         if self._metadata and self._metadata.downloaded_file_path:
             self._downloaded_bytes = self._metadata.downloaded_file_path.stat().st_size
 

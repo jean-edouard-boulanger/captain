@@ -2,7 +2,7 @@ import os
 import traceback
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Any, Optional, TypedDict
+from typing import Any, TypedDict
 
 import yt_dlp
 
@@ -30,7 +30,7 @@ class YoutubeErrorNotification(TypedDict):
     pass
 
 
-class YoutubeDownloadListener(object):
+class YoutubeDownloadListener:
     def _handle_youtube_notification(self, notification: Any) -> None:
         handlers = {
             "downloading": self._handle_youtube_progress,
@@ -59,8 +59,8 @@ class YoutubeDownloadTask(DownloadTaskBase, YoutubeDownloadListener):
         download_request: YoutubeDownloadRequest,
         existing_metadata: DownloadMetadata,
         work_dir: Path,
-        listener: Optional[DownloadListenerBase] = None,
-        progress_report_interval: Optional[timedelta] = None,
+        listener: DownloadListenerBase | None = None,
+        progress_report_interval: timedelta | None = None,
     ):
         self._handle = handle
         self._request = download_request

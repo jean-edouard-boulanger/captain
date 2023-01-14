@@ -1,6 +1,6 @@
 import queue
 import threading
-from typing import Any, Optional, TypeVar
+from typing import Any, TypeVar
 
 from .helpers import set_thread_name
 
@@ -8,10 +8,10 @@ QueueType = TypeVar("QueueType", bound=queue.Queue)
 
 
 class Worker(threading.Thread):
-    class _Stop(object):
+    class _Stop:
         pass
 
-    def __init__(self, message_queue: Optional[QueueType] = None, name: Optional[str] = None):
+    def __init__(self, message_queue: QueueType | None = None, name: str | None = None):
         super().__init__(name=name)
         self._message_queue = message_queue or queue.Queue
 

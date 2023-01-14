@@ -1,6 +1,6 @@
 import multiprocessing
 from datetime import datetime
-from typing import Any, Dict, Protocol
+from typing import Any, Protocol
 
 from .domain import DownloadHandle, DownloadMetadata, ErrorInfo
 from .logging import get_logger
@@ -112,7 +112,7 @@ class ThreadedDownloadListenerBridge(Worker):
         super().__init__(multiprocessing.Queue(), name="DownloadListenerBridge")
         self._listener = listener
 
-    def consume_message(self, message: Dict[str, Dict[str, Any]]) -> None:
+    def consume_message(self, message: dict[str, dict[str, Any]]) -> None:
         try:
             logger.debug(f"download listener bridge consuming message: {message}")
             event_type = list(message.keys())[0]

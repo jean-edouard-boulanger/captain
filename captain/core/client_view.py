@@ -1,5 +1,4 @@
 from datetime import datetime
-from typing import List, Optional
 
 from pydantic import BaseModel
 
@@ -7,7 +6,7 @@ from .domain import DownloadEntry as InternalDownloadEntry
 from .domain import DownloadState as InternalDownloadState
 
 
-def _get_download_progress_pc(state: InternalDownloadState) -> Optional[float]:
+def _get_download_progress_pc(state: InternalDownloadState) -> float | None:
     if state.downloaded_bytes is None or state.metadata is None or state.metadata.file_size is None:
         return None
     return state.downloaded_bytes / state.metadata.file_size
@@ -30,7 +29,7 @@ def _get_valid_actions(state: InternalDownloadState):
     return actions
 
 
-def _get_error_message(state: InternalDownloadState) -> Optional[str]:
+def _get_error_message(state: InternalDownloadState) -> str | None:
     return None if not state.error_info else state.error_info.message
 
 
@@ -45,11 +44,11 @@ class DownloadEntry(BaseModel):
     file_name: str
     status: str
     is_final: bool
-    progress_pc: Optional[float]
-    current_rate: Optional[float]
-    time_scheduled: Optional[datetime]
-    error_message: Optional[str]
-    valid_actions: List[str]
+    progress_pc: float | None
+    current_rate: float | None
+    time_scheduled: datetime | None
+    error_message: str | None
+    valid_actions: list[str]
     download_method: str
 
     @staticmethod

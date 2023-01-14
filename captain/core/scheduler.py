@@ -1,9 +1,10 @@
 import queue
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime
 from queue import Queue
 from threading import Thread
-from typing import Callable, Dict, Optional, Union
+from typing import TypeAlias
 
 import pytz
 
@@ -49,7 +50,7 @@ class _Cancel:
     handle: int
 
 
-_EventType = Union[_StopScheduler, _Schedule, _Cancel]
+_EventType: TypeAlias = _StopScheduler | _Schedule | _Cancel
 
 
 @dataclass
@@ -58,10 +59,10 @@ class _Event:
     future: Future
 
 
-class Scheduler(object):
+class Scheduler:
     def __init__(self):
         self._events = Queue()
-        self._pending_actions: Dict[int, _Entry] = {}
+        self._pending_actions: dict[int, _Entry] = {}
         self._running = True
         self._last_handle = 0
 
@@ -105,7 +106,7 @@ class Scheduler(object):
         logger.debug("scheduler requested to stop")
         return self._queue_event(_StopScheduler()).get()
 
-    def _time_to_next_action(self) -> Optional[float]:
+    def _time_to_next_action(self) -> float | None:
         if len(self._pending_actions) == 0:
             return None
         now = _now_utc()

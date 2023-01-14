@@ -4,13 +4,14 @@ import shutil
 import threading
 import traceback
 import uuid
+from collections.abc import Callable
 from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from functools import partial, wraps
 from pathlib import Path
 from queue import Queue
-from typing import Any, Callable, Dict, List, Optional, Protocol, Tuple, Union
+from typing import Any, Protocol
 
 import pytz
 from send2trash import send2trash
@@ -51,8 +52,8 @@ def _make_error_reference_code() -> str:
 @dataclass
 class _Request:
     handler: Callable
-    args: Tuple[Any]
-    kwargs: Dict[str, Any]
+    args: tuple[Any]
+    kwargs: dict[str, Any]
     future_result: Future
 
 
@@ -68,13 +69,13 @@ def _pop_queue(the_queue: Queue, timeout: timedelta):
         return None
 
 
-def _send_file_to_trash(path: Union[Path, str]):
+def _send_file_to_trash(path: Path | str):
     if not Path(path).is_file():
         raise RuntimeError(f"{path} does not exist or is not a file")
     send2trash(str(path))
 
 
-def _cleanup_files(files: List[Union[Path, str]], permanent: bool):
+def _cleanup_files(files: list[Path | str], permanent: bool):
     assert isinstance(files, list)
     cleanup_strategy = os.remove if permanent else _send_file_to_trash
     for current_file in files:
@@ -106,10 +107,10 @@ class DownloadManager(DownloadListenerBase):
     def __init__(self, settings: DownloadManagerSettings):
         self._settings = settings
         self._db = get_persistence(settings.persistence_settings)
-        self._tasks: Dict[DownloadHandle, DownloadProcessWrapper] = dict()
+        self._tasks: dict[DownloadHandle, DownloadProcessWrapper] = dict()
         self._requests = Queue()
         self._stop_flag = threading.Event()
-        self._observers: List[DownloadManagerObserverBase] = []
+        self._observers: list[DownloadManagerObserverBase] = []
         self._scheduler = ThreadedScheduler(Scheduler())
         self._listener_bridge = ThreadedDownloadListenerBridge(self)
         for entry in self._db.get_all_entries():
@@ -133,7 +134,7 @@ class DownloadManager(DownloadListenerBase):
         return not self._stop_flag.is_set()
 
     @public_endpoint
-    def start_download(self, request: DownloadRequest, blocking: Optional[bool] = False):
+    def start_download(self, request: DownloadRequest, blocking: bool | None = False):
         return self._queue_request(self._handle_schedule_download, args=(request,), blocking=blocking)
 
     @public_endpoint
@@ -141,40 +142,40 @@ class DownloadManager(DownloadListenerBase):
         return self._queue_request(self._handle_reschedule_download, args=(handle, start_at))
 
     @public_endpoint
-    def stop_download(self, handle: DownloadHandle, blocking: Optional[bool] = False):
+    def stop_download(self, handle: DownloadHandle, blocking: bool | None = False):
         return self._queue_request(self._handle_stop_download, args=(handle,), blocking=blocking)
 
     @public_endpoint
-    def pause_download(self, handle: DownloadHandle, blocking: Optional[bool] = False):
+    def pause_download(self, handle: DownloadHandle, blocking: bool | None = False):
         return self._queue_request(self._handle_pause_download, args=(handle,), blocking=blocking)
 
     @public_endpoint
-    def resume_download(self, handle: DownloadHandle, blocking: Optional[bool] = False):
+    def resume_download(self, handle: DownloadHandle, blocking: bool | None = False):
         return self._queue_request(self._handle_resume_download, args=(handle,), blocking=blocking)
 
     @public_endpoint
     def remove_download(
         self,
         handle: DownloadHandle,
-        delete_file: Optional[bool] = False,
-        blocking: Optional[bool] = False,
+        delete_file: bool | None = False,
+        blocking: bool | None = False,
     ):
         return self._queue_request(self._handle_remove_download, args=(handle, delete_file), blocking=blocking)
 
     @public_endpoint
-    def get_download(self, handle: DownloadHandle, blocking: Optional[bool] = False):
+    def get_download(self, handle: DownloadHandle, blocking: bool | None = False):
         return self._queue_request(self._handle_get_download, args=(handle,), blocking=blocking)
 
     @public_endpoint
-    def get_download_file_path(self, handle: DownloadHandle, blocking: Optional[bool] = False):
+    def get_download_file_path(self, handle: DownloadHandle, blocking: bool | None = False):
         return self._queue_request(self._handle_get_download_file_path, args=(handle,), blocking=blocking)
 
     @public_endpoint
-    def get_downloads(self, blocking: Optional[bool] = False):
+    def get_downloads(self, blocking: bool | None = False):
         return self._queue_request(self._handle_get_downloads, blocking=blocking)
 
     @public_endpoint
-    def retry_download(self, handle: DownloadHandle, blocking: Optional[bool] = False):
+    def retry_download(self, handle: DownloadHandle, blocking: bool | None = False):
         return self._queue_request(self._handle_retry_download, args=(handle,), blocking=blocking)
 
     @public_endpoint
@@ -224,7 +225,7 @@ class DownloadManager(DownloadListenerBase):
         self._update_observers(EventType.DOWNLOAD_SCHEDULED, ExternalDownloadEntry.from_internal(entry))
         return handle
 
-    def _hard_download_task_cleanup(self, handle: DownloadHandle, post_action: Optional[str] = None) -> None:
+    def _hard_download_task_cleanup(self, handle: DownloadHandle, post_action: str | None = None) -> None:
         task = self._tasks.get(handle)
         if task and task.is_alive():
             logger.info(f"killing download {handle} subprocess")
@@ -249,7 +250,7 @@ class DownloadManager(DownloadListenerBase):
                     entry.state.error_info = ErrorInfo(message="Internal error", stack=traceback.format_exc())
 
     @contextmanager
-    def _download_error_handler(self, handle: DownloadHandle, post_action: Optional[str] = None) -> None:
+    def _download_error_handler(self, handle: DownloadHandle, post_action: str | None = None) -> None:
         post_action = post_action or "mark_error"
         try:
             yield
@@ -399,7 +400,7 @@ class DownloadManager(DownloadListenerBase):
             )
             logger.debug(f"removed task: {handle}")
 
-    def _handle_get_download(self, handle: DownloadHandle) -> Dict[str, Any]:
+    def _handle_get_download(self, handle: DownloadHandle) -> dict[str, Any]:
         logger.info(f"handling get download request handle={handle}")
         if not self._db.has_entry(handle):
             raise DownloadManagerError(f"download entry not found: {handle.handle}")
@@ -415,7 +416,7 @@ class DownloadManager(DownloadListenerBase):
         invariant(entry.state.file_location is not None)
         return entry.state.file_location
 
-    def _handle_get_downloads(self) -> List[Dict[str, Any]]:
+    def _handle_get_downloads(self) -> list[dict[str, Any]]:
         logger.info("handling get downloads request")
         return [serialize(ExternalDownloadEntry.from_internal(entry)) for entry in self._db.get_all_entries()]
 
@@ -549,9 +550,9 @@ class DownloadManager(DownloadListenerBase):
     def _queue_request(
         self,
         handler: Callable,
-        args: Optional[Tuple] = None,
-        kwargs: Optional[Dict[str, Any]] = None,
-        blocking: Optional[bool] = False,
+        args: tuple | None = None,
+        kwargs: dict[str, Any] | None = None,
+        blocking: bool | None = False,
     ):
         args = args or ()
         kwargs = kwargs or {}
@@ -566,8 +567,8 @@ class DownloadManager(DownloadListenerBase):
         self,
         start_at: datetime,
         handler: Callable,
-        args: Optional[Tuple] = None,
-        kwargs: Optional[Dict[str, Any]] = None,
+        args: tuple | None = None,
+        kwargs: dict[str, Any] | None = None,
     ):
         return self._scheduler.schedule(
             at=start_at,
@@ -599,7 +600,7 @@ class DownloadManager(DownloadListenerBase):
 
     def _request_loop(self):
         logger.debug("entering request loop")
-        shutdown_at: Optional[datetime] = None
+        shutdown_at: datetime | None = None
         while True:
             if self._stop_flag.is_set() and shutdown_at is None:
                 logger.info("shutdown requested, stopping all outstanding tasks")
@@ -614,7 +615,7 @@ class DownloadManager(DownloadListenerBase):
                 if datetime.now() >= shutdown_at:
                     logger.info("shutdown timeout expired, leaving forcefully")
                     return
-            request: Optional[_Request] = _pop_queue(self._requests, timedelta(milliseconds=500))
+            request: _Request | None = _pop_queue(self._requests, timedelta(milliseconds=500))
             if request is None:
                 continue
             try:

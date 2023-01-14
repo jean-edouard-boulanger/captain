@@ -5,8 +5,8 @@ import os
 import sys
 import threading
 from asyncio import Queue
+from collections.abc import Callable
 from pathlib import Path
-from typing import Callable
 
 import aiohttp_cors
 import socketio

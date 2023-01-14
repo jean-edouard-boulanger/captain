@@ -2,9 +2,10 @@ import inspect
 import os
 import signal
 import traceback
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Callable, Optional
+from typing import Any
 
 from .errors import CaptainError
 from .logging import get_logger
@@ -53,7 +54,7 @@ class InvariantViolationError(CaptainError):
         return self._metadata
 
 
-def _extract_broken_invariant_streamer(file_name: str, line_number: int) -> Optional[str]:
+def _extract_broken_invariant_streamer(file_name: str, line_number: int) -> str | None:
     inv_call_symbol = "invariant("
     with open(file_name) as f:
         current_line_number = 0
@@ -66,18 +67,16 @@ def _extract_broken_invariant_streamer(file_name: str, line_number: int) -> Opti
                 if inv_index == -1:
                     return
                 rest = line[inv_index + len(inv_call_symbol) :]
-                for current_char in rest.rstrip():
-                    yield current_char
+                yield from rest.rstrip()
                 yield " "
             else:
-                for current_char in line.strip():
-                    yield current_char
+                yield from line.strip()
                 yield " "
 
 
-def _extract_broken_invariant_impl(file_name: str, line_number: int) -> Optional[str]:
+def _extract_broken_invariant_impl(file_name: str, line_number: int) -> str | None:
     par_stack = ["("]
-    output_buffer = str()
+    output_buffer = ""
     for c in _extract_broken_invariant_streamer(file_name, line_number):
         if c == "(":
             par_stack.append(c)
@@ -93,7 +92,7 @@ def _extract_broken_invariant_impl(file_name: str, line_number: int) -> Optional
     return None
 
 
-def _extract_broken_invariant(file_name: str, line_number: int) -> Optional[str]:
+def _extract_broken_invariant(file_name: str, line_number: int) -> str | None:
     try:
         return _extract_broken_invariant_impl(file_name, line_number)
     except Exception as e:
@@ -127,6 +126,6 @@ def invariant(check: bool):
     _INSTALLED_HANDLER(metadata)
 
 
-def required_value(opt: Optional[Any]) -> Any:
+def required_value(opt: Any | None) -> Any:
     invariant(opt is not None)
     return opt

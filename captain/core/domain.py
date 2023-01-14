@@ -3,7 +3,7 @@ import os
 import uuid
 from datetime import datetime
 from pathlib import Path
-from typing import Annotated, Any, Literal, Optional, Union
+from typing import Annotated, Any, Literal, Union
 from urllib.parse import unquote
 
 from pydantic import BaseModel, Field, SecretStr
@@ -39,7 +39,7 @@ HttpAuthMethodChoiceType = Annotated[HttpAuthMethodType, Field(discriminator="me
 class HttpDownloadRequest(BaseModel):
     method: Literal["http"] = "http"
     remote_file_url: str
-    auth_method: Optional[HttpAuthMethodChoiceType] = None
+    auth_method: HttpAuthMethodChoiceType | None = None
 
     @property
     def remote_file_name(self) -> str:
@@ -54,7 +54,7 @@ class YoutubeAuth(BaseModel):
 class YoutubeDownloadRequest(BaseModel):
     method: Literal["youtube"] = "youtube"
     remote_file_url: str
-    auth: Optional[YoutubeAuth] = None
+    auth: YoutubeAuth | None = None
 
     @property
     def remote_file_name(self) -> str:
@@ -67,7 +67,7 @@ DownloadMethodChoiceType = Annotated[DownloadMethodType, Field(discriminator="me
 
 class DownloadRequest(BaseModel):
     download_dir: Path
-    start_at: Optional[datetime] = None
+    start_at: datetime | None = None
     download_method: DownloadMethodChoiceType
 
     @property
@@ -92,24 +92,24 @@ class DownloadStatus(str, enum.Enum):
 
 class DownloadMetadata(BaseModel):
     downloaded_file_path: Path
-    file_size: Optional[int] = None
-    file_type: Optional[str] = None
-    resumable: Optional[bool] = None
+    file_size: int | None = None
+    file_type: str | None = None
+    resumable: bool | None = None
 
 
 class DownloadState(BaseModel):
     status: DownloadStatus
     work_dir: Path
-    metadata: Optional[DownloadMetadata] = None
-    schedule_handle: Optional[int] = None
-    downloaded_bytes: Optional[int] = None
-    current_rate: Optional[float] = None
-    file_location: Optional[Path] = None
-    requested_status: Optional[DownloadStatus] = None
-    last_update_time: Optional[datetime] = None
-    start_time: Optional[datetime] = None
-    end_time: Optional[datetime] = None
-    error_info: Optional[ErrorInfo] = None
+    metadata: DownloadMetadata | None = None
+    schedule_handle: int | None = None
+    downloaded_bytes: int | None = None
+    current_rate: float | None = None
+    file_location: Path | None = None
+    requested_status: DownloadStatus | None = None
+    last_update_time: datetime | None = None
+    start_time: datetime | None = None
+    end_time: datetime | None = None
+    error_info: ErrorInfo | None = None
 
     @property
     def is_final(self):

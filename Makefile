@@ -22,5 +22,8 @@ isort-check:
 flake8:
 	flake8 captain/
 
+pyupragde:
+	git ls-files -- '*.py' | xargs pyupgrade --py311-plus
+
 lint: black-check isort-check flake8
-format: black isort
+format: pyupragde black isort

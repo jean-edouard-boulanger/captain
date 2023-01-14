@@ -1,7 +1,7 @@
 import json
 import traceback
 from pathlib import Path
-from typing import Dict, List, Literal, Optional
+from typing import Literal
 
 from pydantic import BaseModel
 
@@ -16,17 +16,17 @@ logger = get_logger()
 class InMemoryPersistence(PersistenceBase):
     class Settings(BaseModel):
         persistence_type: Literal["in_memory"] = "in_memory"
-        database_file_path: Optional[str] = None
+        database_file_path: str | None = None
 
     def __init__(self, settings: "InMemoryPersistence.Settings"):
-        self._db: Dict[DownloadHandle, DownloadEntry] = dict()
+        self._db: dict[DownloadHandle, DownloadEntry] = dict()
         self._persist_file_path = (
             Path(settings.database_file_path).expanduser().absolute() if settings.database_file_path else None
         )
         if self._persist_file_path and self._persist_file_path.is_file():
             try:
                 with self._persist_file_path.open() as df:
-                    data: Dict = json.load(df)
+                    data: dict = json.load(df)
                     self._db = {
                         DownloadHandle(handle=handle_str): DownloadEntry.parse_obj(entry_data)
                         for handle_str, entry_data in data.items()
@@ -43,7 +43,7 @@ class InMemoryPersistence(PersistenceBase):
             raise KeyError(f"unknown download handle: {handle}")
         return self._db[handle].copy(deep=True)
 
-    def get_all_entries(self) -> List[DownloadEntry]:
+    def get_all_entries(self) -> list[DownloadEntry]:
         return [entry.copy(deep=True) for entry in self._db.values()]
 
     def remove_entry(self, handle) -> None:
