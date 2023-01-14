@@ -108,17 +108,14 @@ export function StartDownload({onStart, onCancel, settings, controller}) {
     setFormErrors({});
   };
 
-  const submitForm = async ({schedule}) => {
+  const submitForm = async () => {
     const formData = await getFormData();
     if(!formData.valid) {
       setFormErrors(formData.errors);
     }
     else {
       resetForm();
-      onStart({
-        download: formData.download,
-        schedule: schedule || null
-      });
+      onStart(formData.download);
     }
   };
 
@@ -216,7 +213,7 @@ export function StartDownload({onStart, onCancel, settings, controller}) {
         </Grid>
       </CardContent>
       <CardActions>
-        <Button size="small" onClick={() => submitForm({schedule: null})}>
+        <Button size="small" onClick={submitForm}>
           Start
         </Button>
         <Button size="small" onClick={() => {resetForm(); onCancel()}}>

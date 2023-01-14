@@ -1,37 +1,49 @@
 import axios from "axios";
+import { Socket } from "socket.io-client";
 
+
+interface Credentials {
+  username: string | null;
+  password: string | null;
+}
+
+interface Download {
+  remoteFileUrl: string;
+  saveTo: string;
+  downloadDir: string;
+  authMode: string;
+  credentials: Credentials;
+}
 
 export class Controller {
-  constructor(endpoint, socket) {
-    this.endpoint = `http://${endpoint}`;
+  endpoint: string;
+  socket: Socket
+
+  constructor(endpoint: string, socket: Socket) {
+    this.endpoint = endpoint;
+    console.log(this.endpoint);
     this.socket = socket;
   }
-  pauseDownload(handle) {
+
+  pauseDownload(handle: string) {
     this.socket.emit("pause_download", {handle})
   }
-  resumeDownload(handle) {
+  resumeDownload(handle: string) {
     this.socket.emit("resume_download", {handle})
   }
-  stopDownload(handle) {
+  stopDownload(handle: string) {
     this.socket.emit("stop_download", {handle})
   }
-  retryDownload(handle) {
+  retryDownload(handle: string) {
     this.socket.emit("retry_download", {handle})
   }
-  rescheduleDownload(handle, startAt) {
-    this.socket.emit("reschedule_download", {
-      handle,
-      start_at: startAt.toISOString()
-    })
-  }
-  removeDownload({handle, deleteFile}) {
+  removeDownload({handle, deleteFile}: {handle: string, deleteFile: boolean}) {
     this.socket.emit("remove_download", {
       handle,
       delete_file: deleteFile ?? false
     });
   }
-  startDownload(data) {
-    const download = data.download;
+  startDownload(download: Download) {
     const makeAuth = () => {
       if(download.authMode === "none" || download.authMode === null)
       {
@@ -57,23 +69,17 @@ export class Controller {
         }
       }
     }
-    const makeStartAt = () => {
-      if(data.schedule === null) {
-        return null;
-      }
-      return data.schedule.toISOString()
-    };
     this.socket.emit("start_download", {
       download_dir: download.downloadDir,
-      start_at: makeStartAt(),
+      start_at: null,
       download_method: makeDownloadMethod()
     });
   }
-  async validateDownloadDirectory(directory) {
+  async validateDownloadDirectory(directory: string) {
     const resource = `${this.endpoint}/api/v1/core/validate_download_directory`
     return (await axios.post(resource, {directory})).data;
   }
-  getDownloadedFileUrl(downloadHandle) {
-    return `${this.endpoint}/download/${downloadHandle}`
+  getDownloadedFileUrl(handle: string) {
+    return `${this.endpoint}/download/${handle}`
   }
 }
