@@ -21,6 +21,7 @@ from .domain import (
 from .download_listener import DownloadListenerBase, NoOpDownloadListener
 from .download_task import DownloadTaskBase
 from .logging import get_logger
+from .throttle import Throttle
 
 logger = get_logger()
 
@@ -114,7 +115,7 @@ class HttpDownloadTask(DownloadTaskBase):
         self._work_dir = work_dir
         self._listener = listener or NoOpDownloadListener()
         self._stopped_flag = Event()
-        self._progress_report_interval = progress_report_interval or timedelta(seconds=1)
+        self._progress_report_throttle = Throttle(progress_report_interval)
         self._downloaded_bytes: int | None = None
         if self._metadata and self._metadata.downloaded_file_path:
             self._downloaded_bytes = self._metadata.downloaded_file_path.stat().st_size
@@ -126,7 +127,6 @@ class HttpDownloadTask(DownloadTaskBase):
         if self._downloaded_bytes is not None:
             progress_manager.report_progress(self._downloaded_bytes)
             progress_manager.next_slice()
-        next_report_cutoff = datetime.now() + self._progress_report_interval
         while True:
             if self._stopped_flag.is_set():
                 self._listener.download_stopped(datetime.now(), self._handle)
@@ -134,8 +134,7 @@ class HttpDownloadTask(DownloadTaskBase):
             next_chunk = _get_next_chunk(download_iter)
             progress_manager.report_progress(len(next_chunk) if next_chunk else 0)
             is_complete = next_chunk is None
-            if datetime.now() >= next_report_cutoff or is_complete:
-                next_report_cutoff += self._progress_report_interval
+            if self._progress_report_throttle() or is_complete:
                 self._listener.progress_changed(
                     datetime.now(),
                     self._handle,

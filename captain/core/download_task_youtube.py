@@ -11,6 +11,7 @@ from .download_listener import DownloadListenerBase
 from .download_task import DownloadTaskBase
 from .errors import NotSupportedError
 from .logging import get_logger
+from .throttle import Throttle
 
 logger = get_logger()
 
@@ -59,8 +60,8 @@ class YoutubeDownloadTask(DownloadTaskBase, YoutubeDownloadListener):
         download_request: YoutubeDownloadRequest,
         existing_metadata: DownloadMetadata,
         work_dir: Path,
-        listener: DownloadListenerBase | None = None,
-        progress_report_interval: timedelta | None = None,
+        listener: DownloadListenerBase,
+        progress_report_interval: timedelta,
     ):
         self._handle = handle
         self._request = download_request
@@ -68,6 +69,7 @@ class YoutubeDownloadTask(DownloadTaskBase, YoutubeDownloadListener):
         self._listener = listener
         self._work_dir = work_dir
         self._notified_started = False
+        self._progress_report_throttle = Throttle(progress_report_interval)
 
     def _handle_youtube_progress(self, notification: YoutubeProgressNotification) -> None:
         if not self._metadata:
@@ -83,12 +85,15 @@ class YoutubeDownloadTask(DownloadTaskBase, YoutubeDownloadListener):
                 metadata=self._metadata,
             )
             self._notified_started = True
-        self._listener.progress_changed(
-            update_time=datetime.now(),
-            handle=self._handle,
-            downloaded_bytes=notification["downloaded_bytes"],
-            average_rate=notification["speed"],
-        )
+        downloaded_bytes = notification["downloaded_bytes"]
+        is_complete = downloaded_bytes == self._metadata.file_size
+        if self._progress_report_throttle() or is_complete:
+            self._listener.progress_changed(
+                update_time=datetime.now(),
+                handle=self._handle,
+                downloaded_bytes=notification["downloaded_bytes"],
+                average_rate=notification["speed"],
+            )
 
     def run(self):
         try:
