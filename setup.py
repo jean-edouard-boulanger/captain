@@ -1,6 +1,5 @@
 import setuptools
 
-
 setuptools.setup(
     name="captain",
     version="0.0.1",

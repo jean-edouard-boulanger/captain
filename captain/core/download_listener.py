@@ -1,11 +1,11 @@
+import multiprocessing
+from datetime import datetime
+from typing import Any, Dict, Protocol
+
+from .domain import DownloadHandle, DownloadMetadata, ErrorInfo
 from .logging import get_logger
 from .serialization import serialize
-from .domain import DownloadMetadata, ErrorInfo, DownloadHandle
 from .worker import Worker
-
-from datetime import datetime
-from typing import Protocol, Dict, Any
-import multiprocessing
 
 logger = get_logger()
 

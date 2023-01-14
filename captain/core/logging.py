@@ -1,6 +1,6 @@
-from typing import Optional
-import logging.config
 import logging
+import logging.config
+from typing import Optional
 
 
 def configure_logging(log_format: str, log_level: Optional[str] = None) -> None:

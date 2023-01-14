@@ -1,46 +1,45 @@
-from typing import Dict, Any, Optional, Callable, Tuple, List, Union, Protocol
-from datetime import datetime, timedelta
-from functools import partial, wraps
-from contextlib import contextmanager
-from dataclasses import dataclass
-from pathlib import Path
-from queue import Queue
+import os
+import queue
+import shutil
 import threading
 import traceback
-import shutil
-import queue
 import uuid
-import os
+from contextlib import contextmanager
+from dataclasses import dataclass
+from datetime import datetime, timedelta
+from functools import partial, wraps
+from pathlib import Path
+from queue import Queue
+from typing import Any, Callable, Dict, List, Optional, Protocol, Tuple, Union
 
-from send2trash import send2trash
 import pytz
+from send2trash import send2trash
 
-from .serialization import serialize
-from .logging import get_logger
 from .client_view import DownloadEntry as ExternalDownloadEntry
-from .persistence_factory import get_persistence
-from .download_manager_settings import DownloadManagerSettings
-from .download_listener import DownloadListenerBase, ThreadedDownloadListenerBridge
-from .download_process import DownloadProcessWrapper, create_download_process
-from .scheduler import Scheduler, ThreadedScheduler
-from .errors import CaptainError
-from .fs import empty_directory, remove_directory
 from .domain import (
-    DownloadState,
-    DownloadStatus,
-    DownloadMetadata,
-    DownloadRequest,
     DownloadEntry,
     DownloadHandle,
-    ErrorInfo,
-    NotificationSeverity,
-    GeneralNotification,
-    EventType,
     DownloadManagerEvent,
+    DownloadMetadata,
+    DownloadRequest,
+    DownloadState,
+    DownloadStatus,
+    ErrorInfo,
+    EventType,
+    GeneralNotification,
+    NotificationSeverity,
 )
-from .invariant import invariant, required_value
+from .download_listener import DownloadListenerBase, ThreadedDownloadListenerBridge
+from .download_manager_settings import DownloadManagerSettings
+from .download_process import DownloadProcessWrapper, create_download_process
+from .errors import CaptainError
+from .fs import empty_directory, remove_directory
 from .future import Future
-
+from .invariant import invariant, required_value
+from .logging import get_logger
+from .persistence_factory import get_persistence
+from .scheduler import Scheduler, ThreadedScheduler
+from .serialization import serialize
 
 logger = get_logger()
 
@@ -189,7 +188,9 @@ class DownloadManager(DownloadListenerBase):
         )
 
     @public_endpoint
-    def get_download_file_path(self, handle: DownloadHandle, blocking: Optional[bool] = False):
+    def get_download_file_path(
+        self, handle: DownloadHandle, blocking: Optional[bool] = False
+    ):
         return self._queue_request(
             self._handle_get_download_file_path, args=(handle,), blocking=blocking
         )

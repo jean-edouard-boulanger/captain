@@ -1,9 +1,8 @@
 from typing import Union
 
 from .persistence import PersistenceBase
-from .persistence_sqlite import SQLitePersistence
 from .persistence_in_memory import InMemoryPersistence
-
+from .persistence_sqlite import SQLitePersistence
 
 PersistenceSettingsType = Union[
     SQLitePersistence.Settings, InMemoryPersistence.Settings

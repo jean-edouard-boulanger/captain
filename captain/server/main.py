@@ -1,31 +1,30 @@
-from captain.core.serialization import serialize
-from captain.core.helpers import set_thread_name
-from captain.core.logging import get_logger
-from captain.core import (
-    DownloadManager,
-    DownloadManagerSettings,
-    DownloadManagerObserverBase,
-    DownloadRequest,
-    DownloadManagerEvent,
-    DownloadHandle,
-)
-
-import yaml
-import socketio
-
-from dateutil.parser import parse as parse_date
+import argparse
+import asyncio
+import logging
+import os
+import sys
+import threading
+from asyncio import Queue
 from pathlib import Path
 from typing import Callable
-from asyncio import Queue
-from aiohttp import web
-import aiohttp_cors
-import logging
-import argparse
-import threading
-import asyncio
-import sys
-import os
 
+import aiohttp_cors
+import socketio
+import yaml
+from aiohttp import web
+from dateutil.parser import parse as parse_date
+
+from captain.core import (
+    DownloadHandle,
+    DownloadManager,
+    DownloadManagerEvent,
+    DownloadManagerObserverBase,
+    DownloadManagerSettings,
+    DownloadRequest,
+)
+from captain.core.helpers import set_thread_name
+from captain.core.logging import get_logger
+from captain.core.serialization import serialize
 
 sio = socketio.AsyncServer(async_mode="aiohttp", cors_allowed_origins="*")
 routes = web.RouteTableDef()
@@ -105,7 +104,9 @@ async def sio_publisher(event_queue: Queue, emit: Callable):
 
 async def start_sio_publisher(app: web.Application):
     logger.info("starting socket.io pub/sub task")
-    app["sio_publisher"] = asyncio.create_task(sio_publisher(app["event_queue"], sio.emit))
+    app["sio_publisher"] = asyncio.create_task(
+        sio_publisher(app["event_queue"], sio.emit)
+    )
 
 
 async def stop_sio_publisher(app: web.Application):
@@ -187,13 +188,11 @@ async def download_endpoint(request):
     response = web.StreamResponse(
         status=200,
         reason="OK",
-        headers={
-            "Content-disposition": f"attachment; filename={file_path.name}"
-        }
+        headers={"Content-disposition": f"attachment; filename={file_path.name}"},
     )
     await response.prepare(request)
     with file_path.open("rb") as f:
-        while chunk := f.read(2 ** 16):
+        while chunk := f.read(2**16):
             await response.write(chunk)
     return response
 
@@ -203,9 +202,13 @@ async def validate_download_directory_endpoint(request: web.Request):
     payload = await request.json()
     directory = Path(payload["directory"]).expanduser()
     if not directory.is_dir():
-        return web.json_response({"valid": False, "reason": "Does not exist or is not a directory"})
+        return web.json_response(
+            {"valid": False, "reason": "Does not exist or is not a directory"}
+        )
     if not os.access(directory, os.W_OK):
-        return web.json_response({"valid": False, "reason": "This directory is not writable"})
+        return web.json_response(
+            {"valid": False, "reason": "This directory is not writable"}
+        )
     return web.json_response({"valid": True})
 
 
@@ -229,21 +232,22 @@ def main():
     event_loop = asyncio.get_event_loop()
     event_queue = Queue()
     manager = init_manager(manager_settings)
-    manager.add_observer(
-        DownloadManagerEventConsumer(event_queue, event_loop)
-    )
+    manager.add_observer(DownloadManagerEventConsumer(event_queue, event_loop))
     start_manager()
     logger.info("download manager started")
     app = web.Application()
     app["event_queue"] = event_queue
     app.on_startup.append(start_sio_publisher)
-    cors = aiohttp_cors.setup(app, defaults={
-        "*": aiohttp_cors.ResourceOptions(
-            allow_credentials=True,
-            expose_headers="*",
-            allow_headers="*",
-        )
-    })
+    cors = aiohttp_cors.setup(
+        app,
+        defaults={
+            "*": aiohttp_cors.ResourceOptions(
+                allow_credentials=True,
+                expose_headers="*",
+                allow_headers="*",
+            )
+        },
+    )
     app.add_routes(routes)
     for route in list(app.router.routes()):
         cors.add(route)
@@ -253,7 +257,7 @@ def main():
         host=manager_settings.listen_host,
         port=manager_settings.listen_port,
         access_log=None,
-        loop=event_loop
+        loop=event_loop,
     )
     logger.info("web application stopped")
     logger.info("stopping download manager")

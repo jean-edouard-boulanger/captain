@@ -1,8 +1,8 @@
-from typing import Protocol, List, ContextManager
 from contextlib import contextmanager
+from typing import ContextManager, List, Protocol
 
+from .domain import DownloadEntry, DownloadHandle
 from .logging import get_logger
-from .domain import DownloadHandle, DownloadEntry
 
 logger = get_logger()
 

@@ -1,6 +1,6 @@
 import pytest
 
-from captain.core.invariant import invariant, InvariantViolationError
+from captain.core.invariant import InvariantViolationError, invariant
 
 
 def test_broken_invariant():

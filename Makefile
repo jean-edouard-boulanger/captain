@@ -6,3 +6,18 @@ run-server-dev:
 
 install:
 	./install.sh
+
+black:
+	black captain/
+
+black-check:
+	black --check captain/
+
+isort:
+	isort captain/
+
+isort-check:
+	isort --check captain/
+
+lint: black-check isort-check
+format: black isort

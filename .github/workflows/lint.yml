@@ -1,0 +1,22 @@
+name: Lint
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+    branches:
+      - master
+
+jobs:
+  unit-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out captain source
+        uses: actions/checkout@v2
+      - uses: actions/setup-python@v2
+        with:
+          python-version: 3.11
+      - name: Install Python dependencies
+        run: python3.11 -m pip install -r dev.requirements.txt
+      - name: Lint
+        run: make lint

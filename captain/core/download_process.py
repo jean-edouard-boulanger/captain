@@ -1,19 +1,18 @@
-from typing import Optional, Type, Union
-from datetime import timedelta, datetime
-from pathlib import Path
 import multiprocessing
-import threading
-import signal
 import queue
+import signal
+import threading
+from datetime import datetime, timedelta
+from pathlib import Path
+from typing import Optional, Type, Union
 
-from .logging import get_logger
-from .helpers import make_kwargs, set_thread_name
+from .domain import DownloadHandle, DownloadMetadata, DownloadRequest
 from .download_listener import MessageBasedDownloadListener
-from .domain import DownloadHandle, DownloadRequest, DownloadMetadata
+from .download_task import DownloadTaskBase
 from .download_task_http import HttpDownloadTask
 from .download_task_youtube import YoutubeDownloadTask
-from .download_task import DownloadTaskBase
-
+from .helpers import make_kwargs, set_thread_name
+from .logging import get_logger
 
 logger = get_logger()
 

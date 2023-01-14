@@ -1,12 +1,10 @@
-from typing import Optional, List
 from datetime import datetime
+from typing import List, Optional
 
 from pydantic import BaseModel
 
-from .domain import (
-    DownloadEntry as InternalDownloadEntry,
-    DownloadState as InternalDownloadState,
-)
+from .domain import DownloadEntry as InternalDownloadEntry
+from .domain import DownloadState as InternalDownloadState
 
 
 def _get_download_progress_pc(state: InternalDownloadState) -> Optional[float]:

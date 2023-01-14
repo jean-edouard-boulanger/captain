@@ -1,27 +1,26 @@
-from .logging import get_logger
-from .download_task import DownloadTaskBase
-from .download_listener import DownloadListenerBase, NoOpDownloadListener
-from .domain import (
-    HttpDownloadRequest,
-    HttpAuthMethodType,
-    DownloadMetadata,
-    DownloadHandle,
-    ErrorInfo,
-)
-
-from requests.auth import HTTPBasicAuth, HTTPProxyAuth, HTTPDigestAuth
-import requests.exceptions
-import requests
-
-from typing import Optional, List, Union, BinaryIO
+import os
+import traceback
 from dataclasses import dataclass
-from urllib.parse import urlparse, unquote
-from threading import Event
 from datetime import datetime, timedelta
 from pathlib import Path
-import traceback
-import os
+from threading import Event
+from typing import BinaryIO, List, Optional, Union
+from urllib.parse import unquote, urlparse
 
+import requests
+import requests.exceptions
+from requests.auth import HTTPBasicAuth, HTTPDigestAuth, HTTPProxyAuth
+
+from .domain import (
+    DownloadHandle,
+    DownloadMetadata,
+    ErrorInfo,
+    HttpAuthMethodType,
+    HttpDownloadRequest,
+)
+from .download_listener import DownloadListenerBase, NoOpDownloadListener
+from .download_task import DownloadTaskBase
+from .logging import get_logger
 
 logger = get_logger()
 

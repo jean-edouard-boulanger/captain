@@ -1,15 +1,15 @@
-from .helpers import set_thread_name
-from .logging import get_logger
-from .future import Future
-
-from typing import Callable, Dict, Optional, Union
+import queue
 from dataclasses import dataclass
+from datetime import datetime
 from queue import Queue
 from threading import Thread
-from datetime import datetime
-import queue
+from typing import Callable, Dict, Optional, Union
+
 import pytz
 
+from .future import Future
+from .helpers import set_thread_name
+from .logging import get_logger
 
 logger = get_logger()
 

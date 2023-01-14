@@ -1,14 +1,13 @@
-from .logging import get_logger
-from .errors import CaptainError
-
-from typing import Any, Optional, Callable
-from pathlib import Path
-from dataclasses import dataclass
-import os
-import traceback
-import signal
 import inspect
+import os
+import signal
+import traceback
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any, Callable, Optional
 
+from .errors import CaptainError
+from .logging import get_logger
 
 logger = get_logger()
 
