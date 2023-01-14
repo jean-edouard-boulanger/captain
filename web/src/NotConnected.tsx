@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { FunctionComponent } from 'react';
 import {
   Card,
   Grid,
@@ -8,7 +8,12 @@ import {
 import PortableWifiOffIcon from '@mui/icons-material/PortableWifiOff';
 
 
-export function NotConnected({connection}) {
+interface NotConnectedProps {
+  currentState: string
+}
+
+
+export const NotConnected: FunctionComponent<NotConnectedProps> = ({currentState}) => {
   return (
     <Card>
       <CardContent>
@@ -18,7 +23,7 @@ export function NotConnected({connection}) {
           </Grid>
           <Grid item>
             <Typography variant="h5" component="h2">
-              Not connected to Captain server ({connection})
+              Not connected to Captain server ({currentState})
             </Typography>
           </Grid>
         </Grid>

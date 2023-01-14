@@ -138,7 +138,7 @@ function App(props) {
       <Container maxWidth='lg'>
       {
         (!isConnected()) &&
-        <NotConnected connection={connectState} />
+        <NotConnected currentState={connectState} />
       }
       {
         (isConnected()) &&
