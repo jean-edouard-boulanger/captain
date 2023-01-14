@@ -1,11 +1,10 @@
-from typing import List, Annotated
 from datetime import timedelta
 from pathlib import Path
+from typing import Annotated, List
 
 from pydantic import BaseModel, Field, validator
 
 from .persistence_factory import PersistenceSettingsType
-
 
 DEFAULT_LOGGING_FORMAT = (
     "%(asctime)s (%(threadName)s) [%(levelname)s] %(message)s (%(filename)s:%(lineno)d)"

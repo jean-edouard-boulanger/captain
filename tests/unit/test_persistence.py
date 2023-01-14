@@ -3,16 +3,16 @@ from pathlib import Path
 import pytest
 
 from captain.core.domain import (
-    DownloadStatus,
+    DownloadEntry,
     DownloadHandle,
     DownloadRequest,
     DownloadState,
-    DownloadEntry,
+    DownloadStatus,
     HttpDownloadRequest,
 )
-from captain.core.persistence_sqlite import SQLitePersistence
-from captain.core.persistence_in_memory import InMemoryPersistence
 from captain.core.persistence_factory import get_persistence
+from captain.core.persistence_in_memory import InMemoryPersistence
+from captain.core.persistence_sqlite import SQLitePersistence
 from captain.core.serialization import pretty_dump
 
 

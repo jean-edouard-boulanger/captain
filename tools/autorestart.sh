@@ -22,7 +22,7 @@ do
   then
     fswatch -1 -r "${watched}"
   else
-    inotifywait -e modify -e move -e create -e delete -e attrib -r "${watched}"
+    inotifywait -e modify -e move -e create -e delete -e attrib --exclude \.pyc -r "${watched}"
   fi
   echo "changes detected, restarting ..."
   kill -9 "${app_pid}"

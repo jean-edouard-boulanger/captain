@@ -1,9 +1,8 @@
-from typing import Any, TypeVar, Optional
-import threading
 import queue
+import threading
+from typing import Any, Optional, TypeVar
 
 from .helpers import set_thread_name
-
 
 QueueType = TypeVar("QueueType", bound=queue.Queue)
 

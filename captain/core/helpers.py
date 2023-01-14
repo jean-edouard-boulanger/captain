@@ -1,5 +1,5 @@
-from typing import Any
 import platform
+from typing import Any
 
 
 def make_kwargs(**kwargs: Any) -> dict[str, Any]:
@@ -15,7 +15,6 @@ if platform.system() == "Linux":
             pyprctl.set_name(name)
         except Exception:
             pass
-
 
 else:
 

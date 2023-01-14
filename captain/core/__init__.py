@@ -1,15 +1,15 @@
+from .domain import (
+    DownloadHandle,
+    DownloadMetadata,
+    DownloadRequest,
+    DownloadState,
+    DownloadStatus,
+    ErrorInfo,
+)
 from .download_manager import (
     DownloadManager,
-    DownloadManagerSettings,
-    DownloadManagerObserverBase,
     DownloadManagerEvent,
+    DownloadManagerObserverBase,
+    DownloadManagerSettings,
     EventType,
-)
-from .domain import (
-    ErrorInfo,
-    DownloadStatus,
-    DownloadMetadata,
-    DownloadState,
-    DownloadRequest,
-    DownloadHandle,
 )

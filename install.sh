@@ -24,7 +24,7 @@ mkdir -p ${captain_dir}
 captain_server_dir="${captain_dir}/server"
 echo "installing captain server"
 mkdir -p ${captain_server_dir}
-python3.9 -m venv ${captain_server_dir}/venv/
+python3.11 -m venv ${captain_server_dir}/venv/
 venv_python=${captain_server_dir}/venv/bin/python
 ${venv_python} -m pip install --upgrade pip
 ${venv_python} -m pip install -r requirements.txt

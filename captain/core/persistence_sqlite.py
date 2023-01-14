@@ -1,14 +1,14 @@
-from typing import List, Literal
-from pathlib import Path
-
-from pydantic import BaseModel
-import orjson
 import sqlite3
+from pathlib import Path
+from typing import List, Literal
 
-from .serialization import serialize, to_json
-from .persistence import PersistenceBase
-from .domain import DownloadHandle, DownloadEntry
+import orjson
+from pydantic import BaseModel
+
+from .domain import DownloadEntry, DownloadHandle
 from .logging import get_logger
+from .persistence import PersistenceBase
+from .serialization import serialize, to_json
 
 logger = get_logger()
 

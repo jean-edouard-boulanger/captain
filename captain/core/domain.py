@@ -1,12 +1,12 @@
-from typing import Any, Optional, Literal, Union, Annotated
-from urllib.parse import unquote
-from datetime import datetime
-from pathlib import Path
-import uuid
 import enum
 import os
+import uuid
+from datetime import datetime
+from pathlib import Path
+from typing import Annotated, Any, Literal, Optional, Union
+from urllib.parse import unquote
 
-from pydantic import BaseModel, SecretStr, Field
+from pydantic import BaseModel, Field, SecretStr
 
 
 class DownloadHandle(BaseModel):

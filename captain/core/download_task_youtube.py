@@ -1,22 +1,16 @@
-from typing import Optional, Any, TypedDict
+import os
+import traceback
 from datetime import datetime, timedelta
 from pathlib import Path
-import traceback
-import os
+from typing import Any, Optional, TypedDict
 
 import yt_dlp
 
-from .logging import get_logger
-from .errors import NotSupportedError
+from .domain import DownloadHandle, DownloadMetadata, ErrorInfo, YoutubeDownloadRequest
 from .download_listener import DownloadListenerBase
 from .download_task import DownloadTaskBase
-from .domain import (
-    YoutubeDownloadRequest,
-    DownloadMetadata,
-    DownloadHandle,
-    ErrorInfo,
-)
-
+from .errors import NotSupportedError
+from .logging import get_logger
 
 logger = get_logger()
 
