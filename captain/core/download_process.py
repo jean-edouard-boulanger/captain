@@ -6,6 +6,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import TypeAlias
 
+from .constants import DEFAULT_PROGRESS_REPORT_INTERVAL
 from .domain import DownloadHandle, DownloadMetadata, DownloadRequest
 from .download_listener import MessageBasedDownloadListener
 from .download_task import DownloadTaskBase
@@ -35,6 +36,9 @@ class _Stop:
     pass
 
 
+DownloadTaskType: TypeAlias = HttpDownloadTask | YoutubeDownloadTask
+
+
 def _download_process_entrypoint(
     message_queue: multiprocessing.Queue,
     handle: DownloadHandle,
@@ -42,9 +46,9 @@ def _download_process_entrypoint(
     existing_metadata: DownloadMetadata | None,
     work_dir: Path,
     listener: MessageBasedDownloadListener,
-    progress_report_interval: timedelta | None,
-    task_type: type,
-):
+    progress_report_interval: timedelta,
+    task_type: type[DownloadTaskType],
+) -> None:
     signal.signal(signal.SIGINT, signal.SIG_IGN)
     download_task = task_type(
         handle=handle,
@@ -92,16 +96,16 @@ class DownloadProcessWrapper:
         return self._process.is_alive()
 
     def kill(self) -> None:
-        logger.warning(f"killing child process pid={self.pid} handle='{self._handle}'")
+        logger.warning(f"killing download child process pid={self.pid} handle='{self._handle}'")
         self._process.kill()
 
     def start(self) -> None:
-        logger.info(f"starting child process pid={self.pid} handle='{self._handle}'")
         self._process.start()
+        logger.info(f"started download child process pid={self.pid} handle='{self._handle}'")
 
     def stop(self) -> None:
         graceful = self._supports_graceful_stop
-        logger.info(f"stopping child download process pid={self.pid} handle={self._handle} graceful={graceful}")
+        logger.info(f"stopping download child process pid={self.pid} handle={self._handle} graceful={graceful}")
         if graceful and self._process.is_alive():
             self._message_queue.put(_Stop())
             return
@@ -111,11 +115,8 @@ class DownloadProcessWrapper:
         self._listener.download_stopped(update_time=datetime.now(), handle=self._handle)
 
     def join(self):
-        logger.info(f"joining child process pid={self.pid} handle='{self._handle}'")
+        logger.info(f"joining download child process pid={self.pid} handle='{self._handle}'")
         self._process.join()
-
-
-DownloadTaskType: TypeAlias = HttpDownloadTask | YoutubeDownloadTask
 
 
 def get_download_task_type(download_request: DownloadRequest) -> type[DownloadTaskType]:
@@ -133,7 +134,7 @@ def create_download_process(
     existing_metadata: DownloadMetadata | None,
     work_dir: Path,
     listener: MessageBasedDownloadListener,
-    progress_report_interval: timedelta | None = None,
+    progress_report_interval: timedelta = DEFAULT_PROGRESS_REPORT_INTERVAL,
 ) -> DownloadProcessWrapper:
     logger.info(
         "creating download process for"
