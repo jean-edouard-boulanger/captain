@@ -14,6 +14,7 @@ import {
   TableRow,
   Typography
 } from "@mui/material";
+import {SvgIcon} from "@mui/material";
 import MoreVertIcon from "@mui/icons-material/MoreVert";
 import PauseIcon from "@mui/icons-material/Pause";
 import PlayArrowIcon from "@mui/icons-material/PlayArrow";
@@ -22,11 +23,12 @@ import ReplayIcon from "@mui/icons-material/Replay";
 import ClearIcon from "@mui/icons-material/Clear";
 import GetAppIcon from '@mui/icons-material/GetApp';
 import DeleteForeverIcon from '@mui/icons-material/DeleteForever';
-import React, {useState} from "react";
-import {format as format_date} from 'date-fns';
+import React, {useState, FunctionComponent} from 'react';
+import {format as formatDate} from 'date-fns';
+import {Controller} from "./Controller"
 
 
-function formatBytes(bps)
+function formatBytes(bps: number): [string, string]
 {
   if(bps >= 1000000) { return [(bps / 1000000).toFixed(1), "MB"] }
   if(bps >= 1000) { return [(bps / 1000).toFixed(1), "KB"] }
@@ -34,23 +36,38 @@ function formatBytes(bps)
 }
 
 
-const ACTIONS = {
-  Resume: "r",
-  Pause: "p",
-  Stop: "S",
-  Retry: "rt",
-  Reschedule: "rs",
-  Download: "d"
+enum Action {
+  Resume= "r",
+  Pause = "p",
+  Stop = "S",
+  Retry = "rt",
+  Reschedule = "rs",
+  Download = "d"
 }
 
 
-const ACTION_MENU = {
+interface ActionMenuSectionItemProps {
+  text: string;
+  visible: ({valid_actions, is_final}: {valid_actions: Array<string>, is_final: boolean}) => boolean;
+  onClick: ({controller, handle}: {controller: Controller, handle: string}) => void;
+  Icon: typeof SvgIcon;
+}
+
+interface ActionMenuSectionProps {
+  items: Array<ActionMenuSectionItemProps>;
+}
+
+interface ActionMenuProps {
+  sections: Array<ActionMenuSectionProps>;
+}
+
+const ACTION_MENU: ActionMenuProps = {
   sections: [
     {
       items: [
         {
           text: 'Pause',
-          visible: ({valid_actions}) => valid_actions.includes(ACTIONS.Pause),
+          visible: ({valid_actions}) => valid_actions.includes(Action.Pause),
           onClick: ({controller, handle}) => {
             controller.pauseDownload(handle);
           },
@@ -58,7 +75,7 @@ const ACTION_MENU = {
         },
         {
           text: 'Resume',
-          visible: ({valid_actions}) => valid_actions.includes(ACTIONS.Resume),
+          visible: ({valid_actions}) => valid_actions.includes(Action.Resume),
           onClick: ({controller, handle}) => {
             controller.resumeDownload(handle);
           },
@@ -66,7 +83,7 @@ const ACTION_MENU = {
         },
         {
           text: 'Stop',
-          visible: ({valid_actions}) => valid_actions.includes(ACTIONS.Stop),
+          visible: ({valid_actions}) => valid_actions.includes(Action.Stop),
           onClick: ({controller, handle}) => {
             controller.stopDownload(handle);
           },
@@ -74,7 +91,7 @@ const ACTION_MENU = {
         },
         {
           text: 'Retry',
-          visible: ({valid_actions}) => valid_actions.includes(ACTIONS.Retry),
+          visible: ({valid_actions}) => valid_actions.includes(Action.Retry),
           onClick: ({controller, handle}) => {
             controller.retryDownload(handle);
           },
@@ -86,7 +103,7 @@ const ACTION_MENU = {
       items: [
         {
           text: 'Download',
-          visible: ({valid_actions}) => valid_actions.includes(ACTIONS.Download),
+          visible: ({valid_actions}) => valid_actions.includes(Action.Download),
           onClick: ({controller, handle}) => {
             const anchor = document.createElement('a');
             anchor.href = controller.getDownloadedFileUrl(handle);
@@ -108,7 +125,7 @@ const ACTION_MENU = {
         },
         {
           text: 'Remove with data',
-          visible: ({is_final, valid_actions}) => is_final && valid_actions.includes(ACTIONS.Download),
+          visible: ({is_final, valid_actions}) => is_final && valid_actions.includes(Action.Download),
           onClick: ({controller, handle}) => {
             controller.removeDownload({handle, deleteFile: true});
           },
@@ -119,8 +136,8 @@ const ACTION_MENU = {
   ]
 }
 
-function getActionMenuSections({ entry, controller }) {
-  const sections = []
+function getActionMenuSections({ entry, controller }: { entry: any, controller: Controller }) {
+  const sections: Array<Array<ActionMenuSectionItemProps>> = []
   ACTION_MENU.sections.forEach((section) => {
     const items = section.items.filter((item) => {
       return item.visible(entry);
@@ -132,20 +149,25 @@ function getActionMenuSections({ entry, controller }) {
   return sections;
 }
 
-export function DownloadsTable(props) {
-  const [actionMenu, setActionMenu] = useState(null);
+interface DownloadsTableProps {
+  downloads: Array<any>;
+  controller: Controller;
+}
 
-  const {
-    downloads,
-    controller
-  } = props;
+interface ActionMenuAnchorProps {
+  handle: string;
+  anchor: EventTarget & HTMLButtonElement
+}
 
-  const isActionMenuOpen = (handle) => {
-    return actionMenu !== null && actionMenu.handle === handle;
+export const DownloadsTable: FunctionComponent<DownloadsTableProps> = ({downloads, controller}) => {
+  const [actionMenuAnchor, setActionMenuAnchor] = useState<ActionMenuAnchorProps | null>(null);
+
+  const isActionMenuOpen = (handle: string) => {
+    return actionMenuAnchor !== null && actionMenuAnchor.handle === handle;
   }
 
   const closeActionMenu = () => {
-    setActionMenu(null);
+    setActionMenuAnchor(null);
   }
 
   return (
@@ -184,7 +206,7 @@ export function DownloadsTable(props) {
                 </TableCell>
                 <TableCell>
                   {(downloadStatus === "SCHEDULED" && payload.time_scheduled !== null) &&
-                    `Will start on ${format_date(new Date(payload.time_scheduled), 'MM/dd/yyyy hh:mm a')}`
+                    `Will start on ${formatDate(new Date(payload.time_scheduled), 'MM/dd/yyyy hh:mm a')}`
                   }
                   {(payload.progress_pc !== null) &&
                     <LinearProgress variant="determinate"
@@ -203,14 +225,14 @@ export function DownloadsTable(props) {
                   <IconButton aria-label='actions'
                               aria-controls={`actions-menu-${handle}`}
                               aria-haspopup="true"
-                              onClick={(event) => setActionMenu({anchor: event.currentTarget, handle})}>
+                              onClick={(event) => setActionMenuAnchor({anchor: event.currentTarget, handle})}>
                     <MoreVertIcon />
                   </IconButton>
                   <Menu id={`actions-menu-${handle}`}
-                        anchorEl={(actionMenu ?? {anchor: null}).anchor}
+                        anchorEl={(actionMenuAnchor ?? {anchor: null}).anchor}
                         keepMounted
                         open={isActionMenuOpen(handle)}
-                        onClose={() => setActionMenu(null)} >
+                        onClose={() => setActionMenuAnchor(null)} >
                     {
                       getActionMenuSections({ entry: payload, controller }).map((items) => {
                         return items.map((item) => {
