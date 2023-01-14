@@ -20,7 +20,7 @@ do
   app_pid=${!}
   if [[ "$(uname)" == "Darwin" ]]
   then
-    fswatch -1 -r "${watched}"
+    fswatch -1 -e ".*" -i "\\.pyc$" -r "${watched}"
   else
     inotifywait -e modify -e move -e create -e delete -e attrib --exclude \.pyc -r "${watched}"
   fi

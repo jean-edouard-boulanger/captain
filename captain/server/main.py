@@ -23,19 +23,12 @@ from captain.core import (
     DownloadRequest,
 )
 from captain.core.helpers import set_thread_name
-from captain.core.logging import get_logger
 from captain.core.serialization import serialize
 
 sio = socketio.AsyncServer(async_mode="aiohttp", cors_allowed_origins="*")
 routes = web.RouteTableDef()
 
-logging.basicConfig(
-    stream=sys.stdout,
-    level=logging.INFO,
-    format="%(asctime)s (%(threadName)s) [%(levelname)s] %(message)s (%(filename)s:%(lineno)d)",
-)
-
-logger = get_logger()
+logger = logging.getLogger(__name__)
 
 os.environ["PYTHONWARNINGS"] = "ignore:Unverified HTTPS request"
 
@@ -219,6 +212,12 @@ def main():
     config = get_arguments_parser().parse_args()
     with open(config.config) as cf:
         manager_settings = DownloadManagerSettings.parse_obj(yaml.safe_load(cf))
+    logging.basicConfig(
+        stream=sys.stdout,
+        level=manager_settings.logging_settings.level,
+        format="%(asctime)s (%(threadName)s) [%(levelname)s] %(message)s (%(filename)s:%(lineno)d)",
+        force=True,
+    )
     event_loop = asyncio.get_event_loop()
     event_queue = Queue()
     manager = init_manager(manager_settings)
