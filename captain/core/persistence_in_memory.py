@@ -21,25 +21,19 @@ class InMemoryPersistence(PersistenceBase):
     def __init__(self, settings: "InMemoryPersistence.Settings"):
         self._db: Dict[DownloadHandle, DownloadEntry] = dict()
         self._persist_file_path = (
-            Path(settings.database_file_path).expanduser().absolute()
-            if settings.database_file_path
-            else None
+            Path(settings.database_file_path).expanduser().absolute() if settings.database_file_path else None
         )
         if self._persist_file_path and self._persist_file_path.is_file():
             try:
                 with self._persist_file_path.open() as df:
                     data: Dict = json.load(df)
                     self._db = {
-                        DownloadHandle(handle=handle_str): DownloadEntry.parse_obj(
-                            entry_data
-                        )
+                        DownloadHandle(handle=handle_str): DownloadEntry.parse_obj(entry_data)
                         for handle_str, entry_data in data.items()
                     }
             except Exception as e:
                 self._db = {}
-                logger.warning(
-                    f"failed to load persisted state: {e}\n{traceback.format_exc()}"
-                )
+                logger.warning(f"failed to load persisted state: {e}\n{traceback.format_exc()}")
 
     def has_entry(self, handle: DownloadHandle) -> bool:
         return handle in self._db
@@ -61,7 +55,5 @@ class InMemoryPersistence(PersistenceBase):
     def flush(self):
         if self._persist_file_path:
             with self._persist_file_path.open("w") as df:
-                output = {
-                    str(handle): serialize(entry) for handle, entry in self._db.items()
-                }
+                output = {str(handle): serialize(entry) for handle, entry in self._db.items()}
                 df.write(pretty_dump(output))

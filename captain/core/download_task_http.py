@@ -58,12 +58,8 @@ HTTPAuthMethodImplType = Union[HTTPBasicAuth, HTTPProxyAuth, HTTPDigestAuth]
 
 def _make_auth(auth_method: HttpAuthMethodType) -> HTTPAuthMethodImplType:
     if auth_method.method == "basic":
-        return HTTPBasicAuth(
-            auth_method.username, auth_method.password.get_secret_value()
-        )
-    raise ValueError(
-        f"'{type(auth_method).__name__}' is not a supported authentication strategy"
-    )
+        return HTTPBasicAuth(auth_method.username, auth_method.password.get_secret_value())
+    raise ValueError(f"'{type(auth_method).__name__}' is not a supported authentication strategy")
 
 
 @dataclass
@@ -118,16 +114,12 @@ class HttpDownloadTask(DownloadTaskBase):
         self._work_dir = work_dir
         self._listener = listener or NoOpDownloadListener()
         self._stopped_flag = Event()
-        self._progress_report_interval = progress_report_interval or timedelta(
-            seconds=1
-        )
+        self._progress_report_interval = progress_report_interval or timedelta(seconds=1)
         self._downloaded_bytes: Optional[int] = None
         if self._metadata and self._metadata.downloaded_file_path:
             self._downloaded_bytes = self._metadata.downloaded_file_path.stat().st_size
 
-    def _download_loop_impl(
-        self, request: requests.Response, download_buffer: BinaryIO
-    ):
+    def _download_loop_impl(self, request: requests.Response, download_buffer: BinaryIO):
         download_iter = request.iter_content(chunk_size=CHUNK_SIZE)
         progress_manager = ProgressManager()
         progress_manager.next_slice()
@@ -180,9 +172,7 @@ class HttpDownloadTask(DownloadTaskBase):
             request_settings["auth"] = _make_auth(settings.auth_method)
             logger.info(request_settings["auth"])
         if self._downloaded_bytes:
-            request_settings["headers"]["Range"] = _make_range_header(
-                first_byte=self._downloaded_bytes
-            )
+            request_settings["headers"]["Range"] = _make_range_header(first_byte=self._downloaded_bytes)
         with requests.get(settings.remote_file_url, **request_settings) as response:
             response.raise_for_status()
             headers = response.headers
@@ -195,9 +185,7 @@ class HttpDownloadTask(DownloadTaskBase):
                     file_type=headers.get("Content-Type"),
                     resumable=headers.get("Accept-Ranges") == "bytes",
                 )
-            self._listener.download_started(
-                update_time=datetime.now(), handle=self._handle, metadata=self._metadata
-            )
+            self._listener.download_started(update_time=datetime.now(), handle=self._handle, metadata=self._metadata)
             self._download_loop(response)
 
     def run(self):

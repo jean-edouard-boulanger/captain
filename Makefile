@@ -19,5 +19,8 @@ isort:
 isort-check:
 	isort --check captain/
 
-lint: black-check isort-check
+flake8:
+	flake8 captain/
+
+lint: black-check isort-check flake8
 format: black isort

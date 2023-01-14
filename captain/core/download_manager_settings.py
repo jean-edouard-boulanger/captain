@@ -6,9 +6,7 @@ from pydantic import BaseModel, Field, validator
 
 from .persistence_factory import PersistenceSettingsType
 
-DEFAULT_LOGGING_FORMAT = (
-    "%(asctime)s (%(threadName)s) [%(levelname)s] %(message)s (%(filename)s:%(lineno)d)"
-)
+DEFAULT_LOGGING_FORMAT = "%(asctime)s (%(threadName)s) [%(levelname)s] %(message)s (%(filename)s:%(lineno)d)"
 
 
 def _sanitize_path(path: Path):
@@ -39,7 +37,5 @@ class DownloadManagerSettings(BaseModel):
     download_directories: List[DownloadDirectory] = Field(default_factory=list)
     shutdown_timeout: timedelta = timedelta(seconds=10)
     send_files_to_trash: bool = False
-    persistence_settings: Annotated[
-        PersistenceSettingsType, Field(discriminator="persistence_type")
-    ]
+    persistence_settings: Annotated[PersistenceSettingsType, Field(discriminator="persistence_type")]
     logging_settings: LoggingSettings = Field(default_factory=LoggingSettings)

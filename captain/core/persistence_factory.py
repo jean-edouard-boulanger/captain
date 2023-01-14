@@ -4,9 +4,7 @@ from .persistence import PersistenceBase
 from .persistence_in_memory import InMemoryPersistence
 from .persistence_sqlite import SQLitePersistence
 
-PersistenceSettingsType = Union[
-    SQLitePersistence.Settings, InMemoryPersistence.Settings
-]
+PersistenceSettingsType = Union[SQLitePersistence.Settings, InMemoryPersistence.Settings]
 
 
 def get_persistence(settings: PersistenceSettingsType) -> PersistenceBase:

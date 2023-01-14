@@ -8,11 +8,7 @@ from .domain import DownloadState as InternalDownloadState
 
 
 def _get_download_progress_pc(state: InternalDownloadState) -> Optional[float]:
-    if (
-        state.downloaded_bytes is None
-        or state.metadata is None
-        or state.metadata.file_size is None
-    ):
+    if state.downloaded_bytes is None or state.metadata is None or state.metadata.file_size is None:
         return None
     return state.downloaded_bytes / state.metadata.file_size
 

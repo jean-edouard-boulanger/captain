@@ -56,9 +56,7 @@ def init_manager(settings: DownloadManagerSettings) -> DownloadManager:
         get_manager().run()
 
     get_manager.manager = DownloadManager(settings)
-    get_manager.manager_thread = threading.Thread(
-        target=manager_thread_endpoint, name=MANAGER_THREAD_NAME
-    )
+    get_manager.manager_thread = threading.Thread(target=manager_thread_endpoint, name=MANAGER_THREAD_NAME)
     return get_manager.manager
 
 
@@ -104,9 +102,7 @@ async def sio_publisher(event_queue: Queue, emit: Callable):
 
 async def start_sio_publisher(app: web.Application):
     logger.info("starting socket.io pub/sub task")
-    app["sio_publisher"] = asyncio.create_task(
-        sio_publisher(app["event_queue"], sio.emit)
-    )
+    app["sio_publisher"] = asyncio.create_task(sio_publisher(app["event_queue"], sio.emit))
 
 
 async def stop_sio_publisher(app: web.Application):
@@ -143,7 +139,7 @@ async def on_pause_download(_, data):
 
 
 @sio.on("resume_download")
-async def on_start_download(_, data):
+async def on_resume_download(_, data):
     logger.info(f"resume download: {data}")
     handle = DownloadHandle(handle=data["handle"])
     get_manager().resume_download(handle)
@@ -202,21 +198,15 @@ async def validate_download_directory_endpoint(request: web.Request):
     payload = await request.json()
     directory = Path(payload["directory"]).expanduser()
     if not directory.is_dir():
-        return web.json_response(
-            {"valid": False, "reason": "Does not exist or is not a directory"}
-        )
+        return web.json_response({"valid": False, "reason": "Does not exist or is not a directory"})
     if not os.access(directory, os.W_OK):
-        return web.json_response(
-            {"valid": False, "reason": "This directory is not writable"}
-        )
+        return web.json_response({"valid": False, "reason": "This directory is not writable"})
     return web.json_response({"valid": True})
 
 
 def get_arguments_parser():
     parser = argparse.ArgumentParser("captain download manager server")
-    parser.add_argument(
-        "-c", "--config", type=str, required=True, help="path to configuration file"
-    )
+    parser.add_argument("-c", "--config", type=str, required=True, help="path to configuration file")
     return parser
 
 

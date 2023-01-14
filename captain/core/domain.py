@@ -144,8 +144,7 @@ class DownloadState(BaseModel):
     @property
     def can_be_stopped(self) -> bool:
         return (
-            self.status
-            in {DownloadStatus.ACTIVE, DownloadStatus.PAUSED, DownloadStatus.SCHEDULED}
+            self.status in {DownloadStatus.ACTIVE, DownloadStatus.PAUSED, DownloadStatus.SCHEDULED}
             and self.requested_status is None
         )
 

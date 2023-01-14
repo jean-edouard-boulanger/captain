@@ -11,9 +11,7 @@ class Worker(threading.Thread):
     class _Stop(object):
         pass
 
-    def __init__(
-        self, message_queue: Optional[QueueType] = None, name: Optional[str] = None
-    ):
+    def __init__(self, message_queue: Optional[QueueType] = None, name: Optional[str] = None):
         super().__init__(name=name)
         self._message_queue = message_queue or queue.Queue
 

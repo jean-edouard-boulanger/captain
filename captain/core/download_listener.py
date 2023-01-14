@@ -11,9 +11,7 @@ logger = get_logger()
 
 
 class DownloadListenerBase(Protocol):
-    def download_started(
-        self, update_time: datetime, handle: DownloadHandle, metadata: DownloadMetadata
-    ):
+    def download_started(self, update_time: datetime, handle: DownloadHandle, metadata: DownloadMetadata):
         raise NotImplementedError("must implement 'download_started'")
 
     def download_stopped(self, update_time: datetime, handle: DownloadHandle):
@@ -31,16 +29,12 @@ class DownloadListenerBase(Protocol):
     def download_complete(self, update_time: datetime, handle: DownloadHandle):
         raise NotImplementedError("must implement 'download_complete'")
 
-    def download_errored(
-        self, update_time: datetime, handle: DownloadHandle, error_info: ErrorInfo
-    ):
+    def download_errored(self, update_time: datetime, handle: DownloadHandle, error_info: ErrorInfo):
         raise NotImplementedError("must implement 'download_errored'")
 
 
 class NoOpDownloadListener(DownloadListenerBase):
-    def download_started(
-        self, update_time: datetime, handle: DownloadHandle, metadata: DownloadMetadata
-    ):
+    def download_started(self, update_time: datetime, handle: DownloadHandle, metadata: DownloadMetadata):
         logger.debug(f"download started [{handle}]: {serialize(metadata)}")
 
     def download_stopped(self, update_time: datetime, handle: DownloadHandle):
@@ -58,9 +52,7 @@ class NoOpDownloadListener(DownloadListenerBase):
     def download_complete(self, update_time: datetime, handle: DownloadHandle):
         logger.debug(f"download complete [{handle}]")
 
-    def download_errored(
-        self, update_time: datetime, handle: DownloadHandle, error_info: ErrorInfo
-    ):
+    def download_errored(self, update_time: datetime, handle: DownloadHandle, error_info: ErrorInfo):
         logger.debug(f"download errored: {error_info} [{handle}]")
 
 
@@ -68,9 +60,7 @@ class MessageBasedDownloadListener(DownloadListenerBase):
     def __init__(self, message_queue: multiprocessing.Queue):
         self._message_queue = message_queue
 
-    def download_started(
-        self, update_time: datetime, handle: DownloadHandle, metadata: DownloadMetadata
-    ):
+    def download_started(self, update_time: datetime, handle: DownloadHandle, metadata: DownloadMetadata):
         self._message_queue.put(
             {
                 "download_started": {
@@ -82,9 +72,7 @@ class MessageBasedDownloadListener(DownloadListenerBase):
         )
 
     def download_stopped(self, update_time: datetime, handle: DownloadHandle):
-        self._message_queue.put(
-            {"download_stopped": {"update_time": update_time, "handle": handle}}
-        )
+        self._message_queue.put({"download_stopped": {"update_time": update_time, "handle": handle}})
 
     def progress_changed(
         self,
@@ -105,13 +93,9 @@ class MessageBasedDownloadListener(DownloadListenerBase):
         )
 
     def download_complete(self, update_time: datetime, handle: DownloadHandle):
-        self._message_queue.put(
-            {"download_complete": {"update_time": update_time, "handle": handle}}
-        )
+        self._message_queue.put({"download_complete": {"update_time": update_time, "handle": handle}})
 
-    def download_errored(
-        self, update_time: datetime, handle: DownloadHandle, error_info: ErrorInfo
-    ):
+    def download_errored(self, update_time: datetime, handle: DownloadHandle, error_info: ErrorInfo):
         self._message_queue.put(
             {
                 "download_errored": {
@@ -135,9 +119,7 @@ class ThreadedDownloadListenerBridge(Worker):
             event_payload = message[event_type]
             getattr(self._listener, event_type)(**event_payload)
         except Exception as e:
-            logger.error(
-                f"download listener bridge failed to handle message {message}: {e}"
-            )
+            logger.error(f"download listener bridge failed to handle message {message}: {e}")
 
     def make_listener(self) -> MessageBasedDownloadListener:
         return MessageBasedDownloadListener(self._message_queue)

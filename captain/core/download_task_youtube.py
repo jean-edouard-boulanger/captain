@@ -40,17 +40,13 @@ class YoutubeDownloadListener(object):
         status = notification["status"]
         handlers[status](notification)
 
-    def _handle_youtube_progress(
-        self, notification: YoutubeProgressNotification
-    ) -> None:
+    def _handle_youtube_progress(self, notification: YoutubeProgressNotification) -> None:
         pass
 
     def _handle_youtube_error(self, notification: YoutubeErrorNotification) -> None:
         pass
 
-    def _handle_youtube_finished(
-        self, notification: YoutubeFinishedNotification
-    ) -> None:
+    def _handle_youtube_finished(self, notification: YoutubeFinishedNotification) -> None:
         pass
 
 
@@ -73,9 +69,7 @@ class YoutubeDownloadTask(DownloadTaskBase, YoutubeDownloadListener):
         self._work_dir = work_dir
         self._notified_started = False
 
-    def _handle_youtube_progress(
-        self, notification: YoutubeProgressNotification
-    ) -> None:
+    def _handle_youtube_progress(self, notification: YoutubeProgressNotification) -> None:
         if not self._metadata:
             self._metadata = DownloadMetadata(
                 downloaded_file_path=self._work_dir / notification["filename"],
@@ -106,9 +100,7 @@ class YoutubeDownloadTask(DownloadTaskBase, YoutubeDownloadListener):
             os.chdir(self._work_dir)
             with yt_dlp.YoutubeDL(ydl_options) as ydl:
                 ydl.download([self._request.remote_file_url])
-            self._listener.download_complete(
-                update_time=datetime.now(), handle=self._handle
-            )
+            self._listener.download_complete(update_time=datetime.now(), handle=self._handle)
         except Exception as e:
             self._listener.download_errored(
                 datetime.now(),

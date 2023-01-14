@@ -13,3 +13,17 @@ from .download_manager import (
     DownloadManagerSettings,
     EventType,
 )
+
+__all__ = [
+    "DownloadHandle",
+    "DownloadManager",
+    "DownloadManagerEvent",
+    "DownloadManagerObserverBase",
+    "DownloadManagerSettings",
+    "DownloadMetadata",
+    "DownloadRequest",
+    "DownloadState",
+    "DownloadStatus",
+    "ErrorInfo",
+    "EventType",
+]

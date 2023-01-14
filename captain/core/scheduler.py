@@ -75,17 +75,13 @@ class Scheduler(object):
                 self._handle_event(event)
             if not self._running:
                 logger.info("scheduler no longer running")
-                logger.info(
-                    f"leaving main loop with {len(self._pending_actions)} pending actions"
-                )
+                logger.info(f"leaving main loop with {len(self._pending_actions)} pending actions")
                 return
             now = _now_utc()
             cleanup_handles = []
             for handle, entry in self._pending_actions.items():
                 if entry.at <= now:
-                    logger.debug(
-                        f"pending action [{handle}] {entry} if overdue to run, running now"
-                    )
+                    logger.debug(f"pending action [{handle}] {entry} if overdue to run, running now")
                     entry.action()
                     cleanup_handles.append(handle)
             for handle in cleanup_handles:
@@ -93,10 +89,7 @@ class Scheduler(object):
                 del self._pending_actions[handle]
 
     def schedule(self, at: datetime, action: Action):
-        logger.debug(
-            f"requested to schedule action {action} at {at} "
-            f"(in {(at - _now_utc()).total_seconds()}s)"
-        )
+        logger.debug(f"requested to schedule action {action} at {at} " f"(in {(at - _now_utc()).total_seconds()}s)")
         return self._queue_event(_Schedule(_Entry(at, action))).get()
 
     def schedule_unsafe(self, at: datetime, action: Action):
@@ -116,9 +109,7 @@ class Scheduler(object):
         if len(self._pending_actions) == 0:
             return None
         now = _now_utc()
-        min_interval = min(
-            (entry.at - now).total_seconds() for entry in self._pending_actions.values()
-        )
+        min_interval = min((entry.at - now).total_seconds() for entry in self._pending_actions.values())
         return max(min_interval, 0)
 
     def _handle_event_impl(self, event: _Event):
