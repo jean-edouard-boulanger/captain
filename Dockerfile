@@ -22,7 +22,7 @@ RUN python3 -m pip install -r dev.requirements.txt
 WORKDIR /captain/web
 
 COPY web/package*.json .
-RUN npm install
+RUN npm install --save
 
 RUN mkdir -p ~/.captain/downloads
 
