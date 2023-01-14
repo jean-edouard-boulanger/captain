@@ -1,5 +1,7 @@
 import {
-  Chip, Divider,
+  Alert,
+  Chip,
+  Divider,
   IconButton,
   LinearProgress,
   ListItemIcon,
@@ -10,19 +12,19 @@ import {
   TableCell,
   TableContainer,
   TableHead,
-  TableRow, Typography
-} from "@material-ui/core";
-import AccessAlarmIcon from '@material-ui/icons/AccessAlarm';
-import MoreVertIcon from "@material-ui/icons/MoreVert";
-import PauseIcon from "@material-ui/icons/Pause";
-import PlayArrowIcon from "@material-ui/icons/PlayArrow";
-import StopIcon from "@material-ui/icons/Stop";
-import ReplayIcon from "@material-ui/icons/Replay";
-import ClearIcon from "@material-ui/icons/Clear";
-import GetAppIcon from '@material-ui/icons/GetApp';
-import DeleteForeverIcon from '@material-ui/icons/DeleteForever';
+  TableRow,
+  Typography
+} from "@mui/material";
+import AccessAlarmIcon from '@mui/icons-material/AccessAlarm';
+import MoreVertIcon from "@mui/icons-material/MoreVert";
+import PauseIcon from "@mui/icons-material/Pause";
+import PlayArrowIcon from "@mui/icons-material/PlayArrow";
+import StopIcon from "@mui/icons-material/Stop";
+import ReplayIcon from "@mui/icons-material/Replay";
+import ClearIcon from "@mui/icons-material/Clear";
+import GetAppIcon from '@mui/icons-material/GetApp';
+import DeleteForeverIcon from '@mui/icons-material/DeleteForever';
 import React, {useState} from "react";
-import ScheduleDialog from "./ScheduleDialog";
 import {format as format_date} from 'date-fns';
 
 
@@ -79,22 +81,6 @@ const ACTION_MENU = {
             controller.retryDownload(handle);
           },
           Icon: ReplayIcon
-        },
-        {
-          text: 'Start now',
-          visible: ({valid_actions}) => valid_actions.includes(ACTIONS.Reschedule),
-          onClick: ({controller, handle}) => {
-            controller.rescheduleDownload(handle, new Date());
-          },
-          Icon: PlayArrowIcon
-        },
-        {
-          text: 'Reschedule',
-          visible: ({valid_actions}) => valid_actions.includes(ACTIONS.Reschedule),
-          onClick: ({controller, handle}) => {
-            controller.rescheduleDownload(handle, new Date());
-          },
-          Icon: AccessAlarmIcon
         }
       ]
     },
@@ -150,7 +136,6 @@ function getActionMenuSections({ entry, controller }) {
 
 export function DownloadsTable(props) {
   const [actionMenu, setActionMenu] = useState(null);
-  const [scheduleDialog, setScheduleDialog] = useState(null);
 
   const {
     downloads,
@@ -192,9 +177,9 @@ export function DownloadsTable(props) {
                   }
                 </TableCell>
                 <TableCell style={{
-                  "text-overflow": "ellipsis",
-                  "max-width": "200px",
-                  "white-space": "nowrap",
+                  "textOverflow": "ellipsis",
+                  "maxWidth": "200px",
+                  "whiteSpace": "nowrap",
                   "overflow": "hidden"
                 }}>
                   {payload.file_name}
@@ -214,7 +199,7 @@ export function DownloadsTable(props) {
                   }
                 </TableCell>
                 <TableCell>
-                  <Chip variant="outlined" label={downloadStatus} color={downloadStatus === 'ERROR' ? 'secondary' : ''} />
+                  <Chip variant="outlined" label={downloadStatus} color={downloadStatus === 'ERROR' ? 'error' : 'primary'} />
                 </TableCell>
                 <TableCell>
                   <IconButton aria-label='actions'
@@ -258,14 +243,6 @@ export function DownloadsTable(props) {
         }
         </TableBody>
       </Table>
-      <ScheduleDialog open={scheduleDialog !== null}
-                      initialSchedule={(scheduleDialog ?? {}).initialSchedule}
-                      onClose={(schedule) => {
-                        setScheduleDialog(null);
-                        if(schedule !== null && schedule !== undefined) {
-                          scheduleDialog.onReschedule({schedule});
-                        }
-                      }} />
     </TableContainer>
   )
 }

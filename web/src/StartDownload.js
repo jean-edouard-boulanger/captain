@@ -14,8 +14,7 @@ import {
   Select,
   MenuItem,
   Grid
-} from "@material-ui/core";
-import ScheduleDialog from "./ScheduleDialog";
+} from "@mui/material";
 
 
 function isBlank(val) {
@@ -46,7 +45,6 @@ export function StartDownload({onStart, onCancel, settings, controller}) {
   const [authMode, setAuthMode] = useState(null);
   const [credentials, setCredentials] = useState(defaultCredentials())
   const [formErrors, setFormErrors] = useState({})
-  const [displayScheduleDialog, setDisplayScheduleDialog] = useState(false);
 
   useEffect(() => {
     if(isBlank(saveTo)) { return; }
@@ -121,17 +119,6 @@ export function StartDownload({onStart, onCancel, settings, controller}) {
         download: formData.download,
         schedule: schedule || null
       });
-    }
-  };
-
-  const initSchedule = async () => {
-    const formData = await getFormData();
-    if(!formData.valid) {
-      setFormErrors(formData.errors);
-    }
-    else
-    {
-      setDisplayScheduleDialog(true);
     }
   };
 
@@ -232,18 +219,10 @@ export function StartDownload({onStart, onCancel, settings, controller}) {
         <Button size="small" onClick={() => submitForm({schedule: null})}>
           Start
         </Button>
-        <Button size="small" onClick={() => initSchedule()}>
-          Schedule
-        </Button>
         <Button size="small" onClick={() => {resetForm(); onCancel()}}>
           Cancel
         </Button>
       </CardActions>
-      <ScheduleDialog open={displayScheduleDialog}
-                      onClose={(schedule) => {
-                        submitForm({schedule})
-                        setDisplayScheduleDialog(false);
-                      }} />
     </Card>
   );
 }

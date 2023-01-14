@@ -1,5 +1,6 @@
 import React, {useEffect, useState} from 'react';
 import {
+  Alert,
   Container,
   IconButton,
   AppBar,
@@ -9,10 +10,12 @@ import {
   Snackbar,
   Button,
   Typography
-} from '@material-ui/core'
-import MuiAlert from '@material-ui/lab/Alert';
-import ClearIcon from '@material-ui/icons/Clear';
-import AddCircleIcon from '@material-ui/icons/AddCircle';
+} from '@mui/material'
+import ClearIcon from '@mui/icons-material/Clear';
+import AddCircleIcon from '@mui/icons-material/AddCircle';
+import LightModeIcon from '@mui/icons-material/LightMode';
+import DarkModeIcon from '@mui/icons-material/DarkMode';
+
 import socketIOClient from 'socket.io-client'
 
 import { StartDownload } from './StartDownload';
@@ -36,12 +39,8 @@ const ConnectState = {
 }
 
 
-function Alert(props) {
-  return <MuiAlert elevation={6} variant="filled" {...props} />;
-}
-
-
-function App() {
+function App(props) {
+  const {toggleDarkMode, darkMode} = props;
   const [endpoint] = useState(() => getServerEndpoint());
   const [socket, setSocket] = useState(null);
   const [controller, setController] = useState(null);
@@ -50,6 +49,7 @@ function App() {
   const [downloads, setDownloads] = useState([]);
   const [displayNewTaskForm, setDisplayNewTaskForm] = useState(false);
   const [notification, setNotification] = useState(null);
+  const ThemeIcon = darkMode ? LightModeIcon : DarkModeIcon;
 
   useEffect(() => {
     const newSocket = socketIOClient(endpoint);
@@ -119,9 +119,18 @@ function App() {
     <React.Fragment>
       <AppBar title='Captain' color='primary'>
         <Toolbar>
-          <Typography type='title' color='inherit'>
+          <Typography type='title' color='inherit' sx={{ flexGrow: 1 }}>
             Captain
           </Typography>
+          <IconButton size="large"
+                      aria-label="account of current user"
+                      aria-controls="menu-appbar"
+                      aria-haspopup="true"
+                      color="inherit"
+                      onClick={toggleDarkMode} >
+            <ThemeIcon />
+          </IconButton>
+
         </Toolbar>
       </AppBar>
       <Toolbar />
@@ -165,13 +174,12 @@ function App() {
       <Snackbar anchorOrigin={{vertical: 'bottom', horizontal: 'left'}}
                 open={notification !== null}
                 onClose={() => setNotification(null)}
-                autoHideDuration={(notification ?? {}).autoHideDuration}
                 action={
                   <IconButton size="small" aria-label="close" color="inherit" >
                     <ClearIcon fontSize="small" />
                   </IconButton>
                 }>
-        <Alert severity={(notification ?? {}).severity || "info"} >
+        <Alert elevation={6} severity={(notification ?? {}).severity}>
           {(notification ?? {}).message || ""}
         </Alert>
       </Snackbar>

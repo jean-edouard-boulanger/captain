@@ -1,23 +1,54 @@
-import React from 'react';
-import ReactDOM from 'react-dom';
+import React, {useEffect, useState} from 'react';
+import ReactDOM from 'react-dom/client';
 import App from './App';
-import 'fontsource-roboto';
-import { ThemeProvider, createMuiTheme } from '@material-ui/core/styles';
-import CssBaseline from '@material-ui/core/CssBaseline';
+import '@fontsource/roboto';
+import useMediaQuery from '@mui/material/useMediaQuery';
+import { ThemeProvider, createTheme } from '@mui/material/styles';
+import CssBaseline from '@mui/material/CssBaseline';
+
+const DARK_MODE_SETTING_KEY = "captain.darkMode"
 
 
-const theme = createMuiTheme({
-  palette: {
-    type: "dark"
+function makeTheme(darkMode) {
+  return createTheme({
+    palette: {
+      mode: darkMode ? 'dark' : 'light',
+    },
+  });
+}
+
+function getDarkModeDefault(systemUsesDarkByDefault) {
+  const localDefault = localStorage.getItem(DARK_MODE_SETTING_KEY);
+  if(localDefault === "0" || localDefault === null) {
+    return false;
   }
-})
+  return systemUsesDarkByDefault;
+}
 
-ReactDOM.render(
-  <React.StrictMode>
+function setDarkModeDefault(useDarkModeByDefault) {
+  localStorage.setItem(DARK_MODE_SETTING_KEY, useDarkModeByDefault ? "1" : "0");
+}
+
+function AppContainer() {
+  const [darkMode, setDarkMode] = useState(getDarkModeDefault(useMediaQuery('(prefers-color-scheme: dark)')));
+  const [theme, setTheme] = useState(makeTheme(darkMode));
+
+  useEffect(() => {
+    setDarkModeDefault(darkMode);
+    setTheme(makeTheme(darkMode));
+  }, [darkMode])
+
+  return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
-      <App />
+      <App toggleDarkMode={() => setDarkMode(!darkMode)} darkMode={darkMode} />
     </ThemeProvider>
-  </React.StrictMode>,
-  document.getElementById('root')
+  )
+}
+
+const root = ReactDOM.createRoot(document.getElementById("root"));
+root.render(
+  <React.StrictMode>
+    <AppContainer />
+  </React.StrictMode>
 );

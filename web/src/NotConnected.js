@@ -4,8 +4,8 @@ import {
   Grid,
   CardContent,
   Typography,
-} from "@material-ui/core";
-import PortableWifiOffIcon from '@material-ui/icons/PortableWifiOff';
+} from "@mui/material";
+import PortableWifiOffIcon from '@mui/icons-material/PortableWifiOff';
 
 
 export function NotConnected({connection}) {
