@@ -26,6 +26,8 @@ def _get_valid_actions(state: InternalDownloadState):
         actions.append("rs")
     if state.can_be_downloaded:
         actions.append("d")
+    if state.can_be_removed:
+        actions.append("rm")
     return actions
 
 

@@ -26,6 +26,7 @@ def _pop_queue(q: Queue, timeout: float):
         return None
 
 
+ScheduleHandle: TypeAlias = int
 Action = Callable[[], None]
 
 
@@ -46,11 +47,17 @@ class _Schedule:
 
 
 @dataclass
+class _Reschedule:
+    handle: ScheduleHandle
+    at: datetime
+
+
+@dataclass
 class _Cancel:
-    handle: int
+    handle: ScheduleHandle
 
 
-_EventType: TypeAlias = _StopScheduler | _Schedule | _Cancel
+_EventType: TypeAlias = _StopScheduler | _Schedule | _Reschedule | _Cancel
 
 
 @dataclass
@@ -62,11 +69,11 @@ class _Event:
 class Scheduler:
     def __init__(self):
         self._events = Queue()
-        self._pending_actions: dict[int, _Entry] = {}
+        self._pending_actions: dict[ScheduleHandle, _Entry] = {}
         self._running = True
         self._last_handle = 0
 
-    def run(self):
+    def run(self) -> None:
         logger.info("scheduler started")
         while True:
             timeout = self._time_to_next_action()
@@ -89,20 +96,24 @@ class Scheduler:
                 logger.debug(f"cleaning up handle {handle}")
                 del self._pending_actions[handle]
 
-    def schedule(self, at: datetime, action: Action):
+    def schedule(self, at: datetime, action: Action) -> ScheduleHandle:
         logger.debug(f"requested to schedule action {action} at {at} " f"(in {(at - _now_utc()).total_seconds()}s)")
         return self._queue_event(_Schedule(_Entry(at, action))).get()
 
-    def schedule_unsafe(self, at: datetime, action: Action):
+    def reschedule(self, handle: ScheduleHandle, at: datetime) -> None:
+        logger.debug(f"requested to reschedule action {handle} at {at} " f"(in {(at - _now_utc()).total_seconds()}s)")
+        return self._queue_event(_Reschedule(handle, at)).get()
+
+    def schedule_unsafe(self, at: datetime, action: Action) -> ScheduleHandle:
         handle = self._allocate_handle()
         self._pending_actions[handle] = _Entry(at, action)
         return handle
 
-    def cancel(self, handle: int):
+    def cancel(self, handle: ScheduleHandle) -> None:
         logger.debug(f"requested to cancel scheduled action {handle}")
         return self._queue_event(_Cancel(handle)).get()
 
-    def stop(self):
+    def stop(self) -> None:
         logger.debug("scheduler requested to stop")
         return self._queue_event(_StopScheduler()).get()
 
@@ -113,7 +124,7 @@ class Scheduler:
         min_interval = min((entry.at - now).total_seconds() for entry in self._pending_actions.values())
         return max(min_interval, 0)
 
-    def _handle_event_impl(self, event: _Event):
+    def _handle_event_impl(self, event: _Event) -> None:
         payload = event.payload
         if isinstance(payload, _StopScheduler):
             self._running = False
@@ -121,17 +132,19 @@ class Scheduler:
         elif isinstance(payload, _Schedule):
             entry = event.payload.entry
             event.future.set_result(self.schedule_unsafe(entry.at, entry.action))
+        elif isinstance(payload, _Reschedule):
+            self._pending_actions[payload.handle].at = payload.at
         elif isinstance(payload, _Cancel):
             del self._pending_actions[payload.handle]
             event.future.set_result(None)
 
-    def _handle_event(self, event: _Event):
+    def _handle_event(self, event: _Event) -> None:
         try:
             self._handle_event_impl(event)
         except Exception as e:
             event.future.set_error(e)
 
-    def _allocate_handle(self) -> int:
+    def _allocate_handle(self) -> ScheduleHandle:
         handle = self._last_handle
         self._last_handle += 1
         return handle
@@ -152,14 +165,17 @@ class ThreadedScheduler(Thread):
         set_thread_name(self._thread_name)
         return self._scheduler.run()
 
-    def schedule(self, at: datetime, action: Action):
+    def schedule(self, at: datetime, action: Action) -> ScheduleHandle:
         return self._scheduler.schedule(at, action)
 
-    def schedule_unsafe(self, at: datetime, action: Action):
+    def reschedule(self, handle: ScheduleHandle, at: datetime) -> None:
+        return self._scheduler.reschedule(handle, at)
+
+    def schedule_unsafe(self, at: datetime, action: Action) -> ScheduleHandle:
         return self._scheduler.schedule_unsafe(at, action)
 
-    def cancel(self, handle: int):
+    def cancel(self, handle: int) -> None:
         return self._scheduler.cancel(handle)
 
-    def stop(self):
+    def stop(self) -> None:
         return self._scheduler.stop()

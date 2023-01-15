@@ -81,6 +81,7 @@ class ErrorInfo(BaseModel):
 
 
 class DownloadStatus(str, enum.Enum):
+    QUEUED = "QUEUED"
     SCHEDULED = "SCHEDULED"
     PENDING = "PENDING"
     ACTIVE = "ACTIVE"
@@ -122,6 +123,10 @@ class DownloadState(BaseModel):
     @property
     def is_active(self) -> bool:
         return self.status == DownloadStatus.ACTIVE
+
+    @property
+    def can_be_removed(self) -> bool:
+        return self.is_final or self.status == DownloadStatus.QUEUED
 
     @property
     def can_be_resumed(self) -> bool:
@@ -179,6 +184,7 @@ class GeneralNotification(BaseModel):
 
 
 class EventType(str, enum.Enum):
+    DOWNLOAD_QUEUED = "DOWNLOAD_QUEUED"
     DOWNLOAD_SCHEDULED = "DOWNLOAD_SCHEDULED"
     DOWNLOAD_STARTED = "DOWNLOAD_STARTED"
     PROGRESS_CHANGED = "PROGRESS_CHANGED"

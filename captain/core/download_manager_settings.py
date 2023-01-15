@@ -39,3 +39,4 @@ class DownloadManagerSettings(BaseModel):
     send_files_to_trash: bool = False
     persistence_settings: Annotated[PersistenceSettingsType, Field(discriminator="persistence_type")]
     logging_settings: LoggingSettings = Field(default_factory=LoggingSettings)
+    max_outstanding_tasks: int | None = None

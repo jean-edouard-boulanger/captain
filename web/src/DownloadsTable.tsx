@@ -43,7 +43,8 @@ enum Action {
   Stop = "S",
   Retry = "rt",
   Reschedule = "rs",
-  Download = "d"
+  Download = "d",
+  Remove = "rm"
 }
 
 
@@ -118,7 +119,7 @@ const ACTION_MENU: ActionMenuProps = {
       items: [
         {
           text: 'Remove',
-          visible: ({is_final}) => is_final,
+          visible: ({valid_actions}) => valid_actions.includes(Action.Remove),
           onClick: ({controller, handle}) => {
             controller.removeDownload({handle, deleteFile: false});
           },
@@ -126,7 +127,10 @@ const ACTION_MENU: ActionMenuProps = {
         },
         {
           text: 'Remove with data',
-          visible: ({is_final, valid_actions}) => is_final && valid_actions.includes(Action.Download),
+          visible: ({valid_actions}) => {
+            return valid_actions.includes(Action.Remove)
+            && valid_actions.includes(Action.Download)
+          },
           onClick: ({controller, handle}) => {
             controller.removeDownload({handle, deleteFile: true});
           },
@@ -137,7 +141,7 @@ const ACTION_MENU: ActionMenuProps = {
   ]
 }
 
-function getActionMenuSections({ entry, controller }: { entry: any, controller: Controller }) {
+function getActionMenuSections(entry: DownloadTaskEntry) {
   const sections: Array<Array<ActionMenuSectionItemProps>> = []
   ACTION_MENU.sections.forEach((section) => {
     const items = section.items.filter((item) => {
@@ -234,7 +238,7 @@ export const DownloadsTable: FunctionComponent<DownloadsTableProps> = ({download
                         open={isActionMenuOpen(handle)}
                         onClose={() => setActionMenuAnchor(null)} >
                     {
-                      getActionMenuSections({ entry: payload, controller }).map((items) => {
+                      getActionMenuSections(payload).map((items) => {
                         return items.map((item) => {
                           return (
                               <MenuItem
@@ -252,7 +256,7 @@ export const DownloadsTable: FunctionComponent<DownloadsTableProps> = ({download
                                 <Typography variant="inherit">{item.text}</Typography>
                               </MenuItem>
                             )
-                        }).concat([<Divider />])
+                        })
                       })
                     }
                   </Menu>
