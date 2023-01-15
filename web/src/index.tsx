@@ -9,28 +9,28 @@ import CssBaseline from '@mui/material/CssBaseline';
 const DARK_MODE_SETTING_KEY = "captain.darkMode"
 
 
-function makeTheme(darkMode) {
+function makeTheme(enableDarkMode: boolean) {
   return createTheme({
     palette: {
-      mode: darkMode ? 'dark' : 'light',
+      mode: enableDarkMode ? 'dark' : 'light',
     },
   });
 }
 
-function getDarkModeDefault(systemUsesDarkByDefault) {
+function isDarkModeUsedByDefault(systemUsesDarkMode: boolean): boolean {
   const localDefault = localStorage.getItem(DARK_MODE_SETTING_KEY);
-  if(localDefault === "0" || localDefault === null) {
-    return false;
+  if(localDefault === null) {
+    return systemUsesDarkMode;
   }
-  return systemUsesDarkByDefault;
+  return localDefault === "1";
 }
 
-function setDarkModeDefault(useDarkModeByDefault) {
+function setDarkModeDefault(useDarkModeByDefault: boolean) {
   localStorage.setItem(DARK_MODE_SETTING_KEY, useDarkModeByDefault ? "1" : "0");
 }
 
 function AppContainer() {
-  const [darkMode, setDarkMode] = useState(getDarkModeDefault(useMediaQuery('(prefers-color-scheme: dark)')));
+  const [darkMode, setDarkMode] = useState(isDarkModeUsedByDefault(useMediaQuery('(prefers-color-scheme: dark)')));
   const [theme, setTheme] = useState(makeTheme(darkMode));
 
   useEffect(() => {
@@ -46,8 +46,12 @@ function AppContainer() {
   )
 }
 
-const root = ReactDOM.createRoot(document.getElementById("root"));
-root.render(
+const rootElement = document.getElementById("root");
+if(rootElement === null) {
+  throw new Error('Failed to find the root element');
+}
+
+ReactDOM.createRoot(rootElement).render(
   <React.StrictMode>
     <AppContainer />
   </React.StrictMode>
