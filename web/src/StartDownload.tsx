@@ -239,14 +239,11 @@ export const StartDownload: FunctionComponent<StartDownloadProps> = ({onStart, o
                            onChange={(e) => {setDownloadDir(e.target.value)}}
                            helperText={formErrors.downloadDir || ""}
                            disabled={saveTo !== CUSTOM_DOWNLOAD_DIR_SELECTION}
-                           fullWidth />
+                           fullWidth
+                           InputProps={{
+                             endAdornment: <IconButton onClick={() => setBrowserOpened(true)}><FolderOpenIcon /></IconButton>
+                           }} />
               </Box>
-              {
-                (saveTo === CUSTOM_DOWNLOAD_DIR_SELECTION) &&
-                  <Box m={1}>
-                    <IconButton onClick={() => setBrowserOpened(true)}><FolderOpenIcon /></IconButton>
-                  </Box>
-              }
             </Box>
           </Grid>
           <Grid item>
