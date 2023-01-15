@@ -23,7 +23,7 @@ import { DownloadsTable } from "./DownloadsTable";
 import { NotConnected } from "./NotConnected";
 
 import { getServerEndpoint } from './endpoint';
-import { Controller } from "./Controller";
+import { Controller } from "./controller";
 
 import './App.css';
 

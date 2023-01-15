@@ -1,4 +1,4 @@
-import React, {useEffect, useState} from 'react';
+import React, {useEffect, useState, FunctionComponent} from 'react';
 import {
   Button,
   Box,
@@ -15,48 +15,112 @@ import {
   MenuItem,
   Grid
 } from "@mui/material";
-
-
-function isBlank(val) {
-  return val === "" || val === null || val === undefined;
-}
-
-
-function defaultCredentials() {
-  return {username: null, password: null};
-}
+import {
+  AppSettings,
+  DownloadRequest,
+  Controller,
+  AuthMethodTypes,
+  BasicCredentials,
+  AuthMethod,
+  DownloadMethod,
+  YoutubeDownloadMethod,
+  HttpDownloadMethod
+} from "./controller"
+import { isBlank } from "./utils"
 
 const CUSTOM_DOWNLOAD_DIR_SELECTION = "system-custom";
+const BLANK_BASIC_AUTH: BasicCredentials = {method: "basic", username: "", password: ""};
 
-function getDefaultDownloadLocation(settings) {
+function getDefaultDownloadLocation(settings: AppSettings): [string, string | undefined] {
   if(settings.download_directories.length === 0) {
-    return [CUSTOM_DOWNLOAD_DIR_SELECTION, null];
+    return [CUSTOM_DOWNLOAD_DIR_SELECTION, undefined];
   }
-  const download_dir = settings.download_directories[0].directory;
+  const download_dir = settings.download_directories[0]!.directory;
   return [download_dir, download_dir]
 }
 
-export function StartDownload({onStart, onCancel, settings, controller}) {
-  const [remoteFileUrl, setRemoteFileUrl] = useState(null);
-  const [saveTo, setSaveTo] = useState(() => {
+function getBlankAuthMethod(authMethodType: AuthMethodTypes): AuthMethod | null {
+  if(authMethodType === "basic") {
+    return {...BLANK_BASIC_AUTH};
+  }
+  return null;
+}
+
+interface StartDownloadProps {
+  onStart: (request: DownloadRequest) => void;
+  onCancel: () => void;
+  settings: AppSettings;
+  controller: Controller
+}
+
+interface FormDataErrors {
+  remoteFileUrl: boolean;
+  downloadDir: boolean | string;
+  username: boolean;
+  password: boolean;
+}
+
+interface FormData {
+  remoteFileUrl: string;
+  saveTo: string;
+  downloadDir: string;
+  authMethod: AuthMethod | null;
+}
+
+function makeYoutubeDownloadMethod(formData: FormData): YoutubeDownloadMethod {
+  return {
+    method: "youtube",
+    remote_file_url: formData.remoteFileUrl
+  }
+}
+
+function makeHttpDownloadMethod(formData: FormData): HttpDownloadMethod {
+  return {
+    method: "http",
+    remote_file_url: formData.remoteFileUrl,
+    auth_method: formData.authMethod
+  }
+}
+
+function makeDownloadMethod(formData: FormData): DownloadMethod {
+  if (formData.remoteFileUrl.includes("youtube.")) {
+    return makeYoutubeDownloadMethod(formData);
+  }
+  return makeHttpDownloadMethod(formData);
+}
+
+function makeDownloadRequest(formData: FormData): DownloadRequest {
+  return {
+    download_dir: formData.downloadDir,
+    download_method: makeDownloadMethod(formData)
+  }
+}
+
+export const StartDownload: FunctionComponent<StartDownloadProps> = ({onStart, onCancel, settings, controller}) => {
+  const [remoteFileUrl, setRemoteFileUrl] = useState<string | undefined>();
+  const [saveTo, setSaveTo] = useState<string>(() => {
     return getDefaultDownloadLocation(settings)[0]
   });
-  const [downloadDir, setDownloadDir] = useState(null);
-  const [authMode, setAuthMode] = useState(null);
-  const [credentials, setCredentials] = useState(defaultCredentials())
-  const [formErrors, setFormErrors] = useState({})
+  const [downloadDir, setDownloadDir] = useState<string | undefined>();
+  const [authMethodType, setAuthMethodType] = useState<AuthMethodTypes>("none");
+  const [authMethod, setAuthMethod] = useState<AuthMethod | null>(null);
+  const [formErrors, setFormErrors] = useState<Partial<FormDataErrors>>({})
 
   useEffect(() => {
     if(isBlank(saveTo)) { return; }
     if(saveTo === CUSTOM_DOWNLOAD_DIR_SELECTION) {
-      setDownloadDir(null);
+      setDownloadDir(undefined);
       return;
     }
     setDownloadDir(saveTo);
   }, [saveTo]);
 
-  const validateForm = async (data) => {
-    const errors = {}
+  useEffect(() => {
+    setAuthMethod(getBlankAuthMethod(authMethodType))
+  }, [authMethodType])
+
+  const validateForm = async (data: Partial<FormData>) => {
+    const errors: Partial<FormDataErrors> = {}
     if(isBlank(data.remoteFileUrl)) {
       errors.remoteFileUrl = true;
     }
@@ -64,18 +128,16 @@ export function StartDownload({onStart, onCancel, settings, controller}) {
       errors.downloadDir = true;
     }
     if(!isBlank(data.downloadDir)) {
-      const {valid, reason} = await controller.validateDownloadDirectory(data.downloadDir);
+      const {valid, reason} = await controller.validateDownloadDirectory(data.downloadDir as string);
       if(!valid) {
         errors.downloadDir = reason;
       }
     }
-    if(data.authMode === "simple") {
-      if(isBlank(data.credentials.username)) {
+    if(data.authMethod?.method === "basic" && isBlank(data.authMethod?.username)) {
         errors.username = true
-      }
-      if(isBlank(data.credentials.password)) {
+    }
+    if(data.authMethod?.method === "basic" && isBlank(data.authMethod?.password)) {
         errors.password = true
-      }
     }
     return {
       errors,
@@ -84,14 +146,14 @@ export function StartDownload({onStart, onCancel, settings, controller}) {
   }
 
   const getFormData = async () => {
-    const download = {
+    const downloadFormData = {
       remoteFileUrl,
       saveTo,
       downloadDir,
-      authMode,
-      credentials
+      authMethod
     };
-    const validation = await validateForm(download);
+    const validation = await validateForm(downloadFormData);
+    const download = downloadFormData;
     return {
       download,
       ...validation
@@ -100,11 +162,11 @@ export function StartDownload({onStart, onCancel, settings, controller}) {
 
   const resetForm = () => {
     const [defaultSaveTo, defaultDownloadDir] = getDefaultDownloadLocation(settings)
-    setRemoteFileUrl(null);
+    setRemoteFileUrl(undefined);
     setSaveTo(defaultSaveTo);
     setDownloadDir(defaultDownloadDir);
-    setAuthMode(null);
-    setCredentials(defaultCredentials());
+    setAuthMethodType("none");
+    setAuthMethod(null);
     setFormErrors({});
   };
 
@@ -115,13 +177,13 @@ export function StartDownload({onStart, onCancel, settings, controller}) {
     }
     else {
       resetForm();
-      onStart(formData.download);
+      onStart(makeDownloadRequest(formData.download as FormData));
     }
   };
 
   useEffect(() => {
     setFormErrors({})
-  }, [remoteFileUrl, saveTo, downloadDir, authMode, credentials]);
+  }, [remoteFileUrl, saveTo, downloadDir, authMethodType, authMethod]);
 
   return (
     <Card>
@@ -182,31 +244,33 @@ export function StartDownload({onStart, onCancel, settings, controller}) {
                 <FormControl style={{minWidth: 200}}>
                   <InputLabel id="auth-mode-select-label">Authentication</InputLabel>
                   <Select labelId="auth-mode-select-label"
-                          value={authMode || "none"}
-                          onChange={(e) => setAuthMode(e.target.value)}>
+                          value={authMethodType}
+                          onChange={(e) => setAuthMethodType(e.target.value as AuthMethodTypes)}>
                     <MenuItem value="none">None</MenuItem>
-                    <MenuItem value="basic">Basic</MenuItem>
+                    <MenuItem value="basic">Simple</MenuItem>
                   </Select>
                 </FormControl>
               </Box>
-              <Box m={1} hidden={authMode !== "basic"}>
+              <Box m={1} hidden={authMethodType !== "basic"}>
                 <TextField label="Username"
                            error={formErrors.username !== undefined}
                            onChange={(e) => {
-                             credentials.username = e.target.value;
-                             setCredentials({...credentials});
+                             const basicAuth = authMethod as BasicCredentials;
+                             basicAuth.username = e.target.value;
+                             setAuthMethod({...basicAuth});
                            }}
-                           value={credentials.username || ""} />
+                           value={authMethod?.username || ""} />
               </Box>
-              <Box m={1} hidden={authMode !== "basic"}>
+              <Box m={1} hidden={authMethodType !== "basic"}>
                 <TextField label="Password"
                            type="password"
                            error={formErrors.password !== undefined}
                            onChange={(e) => {
-                             credentials.password = e.target.value;
-                             setCredentials({...credentials});
+                             const basicAuth = authMethod as BasicCredentials;
+                             basicAuth.password = e.target.value;
+                             setAuthMethod({...basicAuth});
                            }}
-                           value={credentials.password || ""}/>
+                           value={authMethod?.password || ""}/>
               </Box>
             </Box>
           </Grid>

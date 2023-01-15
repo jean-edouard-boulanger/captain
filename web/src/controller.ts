@@ -1,18 +1,47 @@
 import axios from "axios";
 import { Socket } from "socket.io-client";
 
+export const ALL_AUTH_METHODS_TYPES = ["none", "basic"] as const
+type AuthMethodTypesTuple = typeof ALL_AUTH_METHODS_TYPES
+export type AuthMethodTypes = AuthMethodTypesTuple[number]
 
-interface Credentials {
-  username: string | null;
-  password: string | null;
+export interface AuthMethodBase<Method extends AuthMethodTypes> {
+  method: Method
 }
 
-interface Download {
-  remoteFileUrl: string;
-  saveTo: string;
-  downloadDir: string;
-  authMode: string;
-  credentials: Credentials;
+export interface BasicCredentials extends AuthMethodBase<"basic"> {
+  username: string;
+  password: string;
+}
+
+export type AuthMethod = BasicCredentials
+
+export interface HttpDownloadMethod {
+  method: "http";
+  remote_file_url: string;
+  auth_method: AuthMethod | null;
+}
+
+export interface YoutubeDownloadMethod {
+  method: "youtube";
+  remote_file_url: string;
+}
+
+export type DownloadMethod = HttpDownloadMethod | YoutubeDownloadMethod;
+
+export interface DownloadRequest {
+  download_dir: string;
+  download_method: DownloadMethod
+  start_at?: null;
+}
+
+export interface DownloadDirectory {
+  directory: string;
+  label: string
+}
+
+export interface AppSettings {
+  download_directories: Array<DownloadDirectory>;
 }
 
 export class Controller {
@@ -43,8 +72,8 @@ export class Controller {
       delete_file: deleteFile ?? false
     });
   }
-  startDownload(download: Download) {
-    const makeAuth = () => {
+  startDownload(request: DownloadRequest) {
+    /*const makeAuth = () => {
       if(download.authMode === "none" || download.authMode === null)
       {
         return null;
@@ -68,12 +97,8 @@ export class Controller {
           auth_method: makeAuth()
         }
       }
-    }
-    this.socket.emit("start_download", {
-      download_dir: download.downloadDir,
-      start_at: null,
-      download_method: makeDownloadMethod()
-    });
+    }*/
+    this.socket.emit("start_download", request);
   }
   async validateDownloadDirectory(directory: string) {
     const resource = `${this.endpoint}/api/v1/core/validate_download_directory`

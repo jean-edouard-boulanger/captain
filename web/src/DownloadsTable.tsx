@@ -25,7 +25,7 @@ import GetAppIcon from '@mui/icons-material/GetApp';
 import DeleteForeverIcon from '@mui/icons-material/DeleteForever';
 import React, {useState, FunctionComponent} from 'react';
 import {format as formatDate} from 'date-fns';
-import {Controller} from "./Controller"
+import {Controller} from "./controller"
 
 
 function formatBytes(bps: number): [string, string]
