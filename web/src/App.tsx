@@ -1,15 +1,15 @@
-import React, {useEffect, useState, FunctionComponent} from 'react';
+import React, {FunctionComponent, useEffect, useState} from 'react';
 import {
   Alert,
   AlertColor,
-  Container,
-  IconButton,
   AppBar,
-  Toolbar,
-  Grid,
-  Collapse,
-  Snackbar,
   Button,
+  Collapse,
+  Container,
+  Grid,
+  IconButton,
+  Snackbar,
+  Toolbar,
   Typography
 } from '@mui/material'
 import ClearIcon from '@mui/icons-material/Clear';
@@ -17,13 +17,13 @@ import AddCircleIcon from '@mui/icons-material/AddCircle';
 import LightModeIcon from '@mui/icons-material/LightMode';
 import DarkModeIcon from '@mui/icons-material/DarkMode';
 
-import { StartDownload } from './StartDownload';
-import { DownloadsTable } from "./DownloadsTable";
-import { NotConnected } from "./NotConnected";
+import {StartDownload} from './StartDownload';
+import {DownloadsTable} from "./DownloadsTable";
+import {NotConnected} from "./NotConnected";
 
-import { getServerEndpoint } from './endpoint';
-import { AppSettings, ConnectState, DownloadTaskEntry } from "./domain";
-import { Controller } from "./controller";
+import {getServerEndpoint} from './endpoint';
+import {AppSettings, ConnectState, DownloadTaskEntry} from "./domain";
+import {Controller} from "./controller";
 
 import './App.css';
 
@@ -36,6 +36,7 @@ interface AppProps {
 interface Notification {
   severity: string;
   message: string;
+  duration?: number;
 }
 
 export const App: FunctionComponent<AppProps> = ({toggleDarkMode, darkMode}) => {
@@ -54,6 +55,19 @@ export const App: FunctionComponent<AppProps> = ({toggleDarkMode, darkMode}) => 
       endpoint,
       eventHandlers: {
         onConnectionStateChanged: (newState) => {
+          if (newState === ConnectState.Connect) {
+            setNotification({
+              severity: "info",
+              message: "Connected to captain server",
+              duration: 2000
+            })
+          }
+          if (newState !== ConnectState.Connect) {
+            setNotification({
+              severity: "error",
+              message: "Lost connection to captain server"
+            })
+          }
           setConnectState(newState);
         },
         onRecap: (data) => {
@@ -154,6 +168,7 @@ export const App: FunctionComponent<AppProps> = ({toggleDarkMode, darkMode}) => 
       }
       </Container>
       <Snackbar anchorOrigin={{vertical: 'bottom', horizontal: 'left'}}
+                autoHideDuration={notification?.duration ?? 5000}
                 open={notification !== null}
                 onClose={() => setNotification(null)}
                 action={
