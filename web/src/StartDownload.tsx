@@ -240,8 +240,8 @@ export const StartDownload: FunctionComponent<StartDownloadProps> = ({onStart, o
                            helperText={formErrors.downloadDir || ""}
                            disabled={saveTo !== CUSTOM_DOWNLOAD_DIR_SELECTION}
                            fullWidth
-                           InputProps={{
-                             endAdornment: <IconButton onClick={() => setBrowserOpened(true)}><FolderOpenIcon /></IconButton>
+                           InputProps={(saveTo !== CUSTOM_DOWNLOAD_DIR_SELECTION) ? undefined : {
+                             endAdornment:<IconButton onClick={() => setBrowserOpened(true)}><FolderOpenIcon /></IconButton>
                            }} />
               </Box>
             </Box>

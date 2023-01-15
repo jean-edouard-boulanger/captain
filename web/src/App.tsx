@@ -17,7 +17,6 @@ import AddCircleIcon from '@mui/icons-material/AddCircle';
 import LightModeIcon from '@mui/icons-material/LightMode';
 import DarkModeIcon from '@mui/icons-material/DarkMode';
 
-import { FileBrowserDialog } from "./FileBrowserDialog";
 import { StartDownload } from './StartDownload';
 import { DownloadsTable } from "./DownloadsTable";
 import { NotConnected } from "./NotConnected";
