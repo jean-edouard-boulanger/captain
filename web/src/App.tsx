@@ -1,6 +1,7 @@
-import React, {useEffect, useState} from 'react';
+import React, {useEffect, useState, FunctionComponent} from 'react';
 import {
   Alert,
+  AlertColor,
   Container,
   IconButton,
   AppBar,
@@ -21,20 +22,30 @@ import { DownloadsTable } from "./DownloadsTable";
 import { NotConnected } from "./NotConnected";
 
 import { getServerEndpoint } from './endpoint';
-import { ConnectState } from "./domain";
+import { AppSettings, ConnectState, DownloadTaskEntry } from "./domain";
 import { Controller } from "./controller";
 
 import './App.css';
 
 
-function App({toggleDarkMode, darkMode}) {
-  const [endpoint] = useState(() => getServerEndpoint());
-  const [controller, setController] = useState(null);
-  const [connectState, setConnectState] = useState(ConnectState.Disconnect);
-  const [settings, setSettings] = useState(null);
-  const [downloads, setDownloads] = useState([]);
-  const [displayNewTaskForm, setDisplayNewTaskForm] = useState(false);
-  const [notification, setNotification] = useState(null);
+interface AppProps {
+  toggleDarkMode: () => void;
+  darkMode: boolean
+}
+
+interface Notification {
+  severity: string;
+  message: string;
+}
+
+const App: FunctionComponent<AppProps> = ({toggleDarkMode, darkMode}) => {
+  const [endpoint] = useState<string>(() => getServerEndpoint());
+  const [controller, setController] = useState<Controller | null>(null);
+  const [connectState, setConnectState] = useState<ConnectState>(ConnectState.Disconnect);
+  const [settings, setSettings] = useState<AppSettings | null>(null);
+  const [downloads, setDownloads] = useState<Array<DownloadTaskEntry>>([]);
+  const [displayNewTaskForm, setDisplayNewTaskForm] = useState<boolean>(false);
+  const [notification, setNotification] = useState<Notification | null>(null);
   const ThemeIcon = darkMode ? LightModeIcon : DarkModeIcon;
 
   useEffect(() => {
@@ -47,40 +58,34 @@ function App({toggleDarkMode, darkMode}) {
         },
         onRecap: (data) => {
           setSettings(data.settings);
-          setDownloads(data.downloads.map(entry => {
-            return {
-              handle: entry.handle,
-              payload: entry
-            };
-          }));
+          setDownloads(data.downloads);
         },
-        onNotification: (data) => {
+        onNotification: ({payload}) => {
           setNotification({
-            severity: data.payload.severity.toLowerCase(),
-            message: data.payload.message,
+            severity: payload.severity.toLowerCase(),
+            message: payload.message,
           });
         },
-        onDownloadTaskEvent: (data) => {
-          if(data.event_type === "DOWNLOAD_ERRORED") {
+        onDownloadTaskEvent: (event) => {
+          if(event.event_type === "DOWNLOAD_ERRORED") {
             setNotification({
               severity: "error",
-              message: data.payload.error_message,
+              message: event.payload.error_message,
             })
           }
+          const payload = event.payload;
           setDownloads(current => {
+            let exists = false;
             const newDownloads = [...current];
-            let existing = false;
-            newDownloads.forEach(entry => {
-              if (entry.handle === data.payload.handle) {
-                entry.payload = data.payload;
-                existing = true;
+            for(let i = 0; i < current.length && !exists; ++i) {
+              const entry = newDownloads[i];
+              if(entry!.handle === payload.handle) {
+                newDownloads[i] = payload;
+                exists = true;
               }
-            });
-            if(!existing) {
-              newDownloads.push({
-                handle: data.payload.handle,
-                payload: data.payload
-              })
+            }
+            if (!exists) {
+              newDownloads.push(payload);
             }
             return newDownloads;
           });
@@ -97,7 +102,7 @@ function App({toggleDarkMode, darkMode}) {
     <React.Fragment>
       <AppBar title='Captain' color='primary'>
         <Toolbar>
-          <Typography type='title' color='inherit' sx={{ flexGrow: 1 }}>
+          <Typography variant='inherit' color='inherit' sx={{ flexGrow: 1 }}>
             Captain
           </Typography>
           <IconButton size="large"
@@ -134,17 +139,16 @@ function App({toggleDarkMode, darkMode}) {
             <Grid item xs={12}>
               <StartDownload onStart={(data) => {
                                setDisplayNewTaskForm(false);
-                               controller.startDownload(data);
+                               controller!.startDownload(data);
                              }}
                              onCancel={() => setDisplayNewTaskForm(false)}
-                             settings={settings}
-                             controller={controller} />
+                             settings={settings!}
+                             controller={controller!} />
             </Grid>
           </Collapse>
           <Grid item xs={12}>
             <DownloadsTable downloads={downloads}
-                            controller={controller}
-                            settings={settings} />
+                            controller={controller!} />
           </Grid>
         </React.Fragment>
       }
@@ -157,7 +161,7 @@ function App({toggleDarkMode, darkMode}) {
                     <ClearIcon fontSize="small" />
                   </IconButton>
                 }>
-        <Alert elevation={6} severity={(notification ?? {}).severity}>
+        <Alert elevation={6} severity={((notification ?? {}).severity || "info") as AlertColor}>
           {(notification ?? {}).message || ""}
         </Alert>
       </Snackbar>

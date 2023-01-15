@@ -25,6 +25,7 @@ import GetAppIcon from '@mui/icons-material/GetApp';
 import DeleteForeverIcon from '@mui/icons-material/DeleteForever';
 import React, {useState, FunctionComponent} from 'react';
 import {format as formatDate} from 'date-fns';
+import {DownloadTaskEntry} from "./domain"
 import {Controller} from "./controller"
 
 
@@ -150,7 +151,7 @@ function getActionMenuSections({ entry, controller }: { entry: any, controller: 
 }
 
 interface DownloadsTableProps {
-  downloads: Array<any>;
+  downloads: Array<DownloadTaskEntry>;
   controller: Controller;
 }
 
@@ -185,8 +186,7 @@ export const DownloadsTable: FunctionComponent<DownloadsTableProps> = ({download
         </TableHead>
         <TableBody>
         {
-          downloads.map(entry => {
-            const payload = entry.payload;
+          downloads.map(payload => {
             const handle = payload.handle;
             const downloadStatus = payload.status;
             return (

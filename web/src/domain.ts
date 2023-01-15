@@ -57,12 +57,13 @@ export enum ConnectState {
   ReconnectFailed = "reconnect_failed"
 }
 
-export interface DownloadEntry {
+export interface DownloadTaskEntry {
   handle: string;
   file_name: string;
   status: string;
   is_final: boolean;
-  process_pc: number;
+  progress_pc: number;
+  time_scheduled: Date;
   current_rate: number;
   error_message: string;
   valid_actions: Array<string>;
@@ -70,7 +71,7 @@ export interface DownloadEntry {
 }
 
 export interface RecapEvent {
-  downloads: Array<DownloadEntry>;
+  downloads: Array<DownloadTaskEntry>;
   settings: AppSettings
 }
 
@@ -97,5 +98,5 @@ export interface GeneralNotificationPayload {
 }
 
 export type GeneralNotificationEvent = DownloadEventBase<"GENERAL_NOTIFICATION", GeneralNotificationPayload>
-export type DownloadTaskEvent = DownloadEventBase<DownloadTaskEventTypes, DownloadEntry>
+export type DownloadTaskEvent = DownloadEventBase<DownloadTaskEventTypes, DownloadTaskEntry>
 export type DownloadEvent = GeneralNotificationEvent | DownloadTaskEvent
