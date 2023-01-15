@@ -36,6 +36,15 @@ os.environ["PYTHONWARNINGS"] = "ignore:Unverified HTTPS request"
 MANAGER_THREAD_NAME = "DownloadManager"
 
 
+def configure_logging(log_level: str) -> None:
+    logging.basicConfig(
+        stream=sys.stdout,
+        level=log_level,
+        format="%(asctime)s (%(threadName)s) [%(levelname)s] %(message)s (%(filename)s:%(lineno)d)",
+        force=True,
+    )
+
+
 def get_manager() -> DownloadManager:
     manager = get_manager.manager
     if manager is None:
@@ -212,12 +221,7 @@ def main():
     config = get_arguments_parser().parse_args()
     with open(config.config) as cf:
         manager_settings = DownloadManagerSettings.parse_obj(yaml.safe_load(cf))
-    logging.basicConfig(
-        stream=sys.stdout,
-        level=manager_settings.logging_settings.level,
-        format="%(asctime)s (%(threadName)s) [%(levelname)s] %(message)s (%(filename)s:%(lineno)d)",
-        force=True,
-    )
+    configure_logging(manager_settings.logging_settings.level)
     event_loop = asyncio.get_event_loop()
     event_queue = Queue()
     manager = init_manager(manager_settings)

@@ -16,35 +16,21 @@ import AddCircleIcon from '@mui/icons-material/AddCircle';
 import LightModeIcon from '@mui/icons-material/LightMode';
 import DarkModeIcon from '@mui/icons-material/DarkMode';
 
-import socketIOClient from 'socket.io-client'
-
 import { StartDownload } from './StartDownload';
 import { DownloadsTable } from "./DownloadsTable";
 import { NotConnected } from "./NotConnected";
 
 import { getServerEndpoint } from './endpoint';
+import { ConnectState } from "./domain";
 import { Controller } from "./controller";
 
 import './App.css';
 
 
-const ConnectState = {
-  CONNECT: "connected",
-  CONNECTING: "connecting",
-  DISCONNECT: "disconnected",
-  CONNECT_FAILED: "connection failed",
-  RECONNECT: "connected",
-  RECONNECTING: "connecting",
-  RECONNECT_FAILED: "connection failed"
-}
-
-
-function App(props) {
-  const {toggleDarkMode, darkMode} = props;
+function App({toggleDarkMode, darkMode}) {
   const [endpoint] = useState(() => getServerEndpoint());
-  const [socket, setSocket] = useState(null);
   const [controller, setController] = useState(null);
-  const [connectState, setConnectState] = useState(ConnectState.DISCONNECT);
+  const [connectState, setConnectState] = useState(ConnectState.Disconnect);
   const [settings, setSettings] = useState(null);
   const [downloads, setDownloads] = useState([]);
   const [displayNewTaskForm, setDisplayNewTaskForm] = useState(false);
@@ -52,67 +38,59 @@ function App(props) {
   const ThemeIcon = darkMode ? LightModeIcon : DarkModeIcon;
 
   useEffect(() => {
-    const newSocket = socketIOClient(endpoint);
-    setSocket(newSocket);
-    setController(new Controller(endpoint, newSocket));
+    if(endpoint === null) { return; }
+    setController(new Controller({
+      endpoint,
+      eventHandlers: {
+        onConnectionStateChanged: (newState) => {
+          setConnectState(newState);
+        },
+        onRecap: (data) => {
+          setSettings(data.settings);
+          setDownloads(data.downloads.map(entry => {
+            return {
+              handle: entry.handle,
+              payload: entry
+            };
+          }));
+        },
+        onNotification: (data) => {
+          setNotification({
+            severity: data.payload.severity.toLowerCase(),
+            message: data.payload.message,
+          });
+        },
+        onDownloadTaskEvent: (data) => {
+          if(data.event_type === "DOWNLOAD_ERRORED") {
+            setNotification({
+              severity: "error",
+              message: data.payload.error_message,
+            })
+          }
+          setDownloads(current => {
+            const newDownloads = [...current];
+            let existing = false;
+            newDownloads.forEach(entry => {
+              if (entry.handle === data.payload.handle) {
+                entry.payload = data.payload;
+                existing = true;
+              }
+            });
+            if(!existing) {
+              newDownloads.push({
+                handle: data.payload.handle,
+                payload: data.payload
+              })
+            }
+            return newDownloads;
+          });
+        }
+      }
+    }));
   }, [endpoint]);
 
-  useEffect(() => {
-    if(socket === null) { return; }
-    socket.on("connect", () => { setConnectState(ConnectState.CONNECT); });
-    socket.on("connecting", () => { setConnectState(ConnectState.CONNECTING); });
-    socket.on("disconnect", () => { setConnectState(ConnectState.DISCONNECT); });
-    socket.on("connect_failed", () => { setConnectState(ConnectState.CONNECT_FAILED); });
-    socket.on("reconnect", () => { setConnectState(ConnectState.CONNECT); });
-    socket.on("reconnecting", () => { setConnectState(ConnectState.RECONNECTING); });
-    socket.on("reconnect_failed", () => { setConnectState(ConnectState.RECONNECT_FAILED); });
-
-    socket.on("recap", data => {
-      setSettings(data.settings);
-      setDownloads(data.downloads.map(entry => {
-        return {
-          handle: entry.handle,
-          payload: entry
-        };
-      }));
-    });
-
-    socket.on("download_event", data => {
-      if(data.event_type === "GENERAL_NOTIFICATION") {
-        setNotification({
-          message: data.payload.message,
-          severity: data.payload.severity.toLowerCase()
-        });
-        return;
-      }
-      if(data.event_type === "DOWNLOAD_ERRORED") {
-        setNotification({
-          message: data.payload.error_message,
-          severity: "error"
-        })
-      }
-      setDownloads(current => {
-        const newDownloads = [...current];
-        let existing = false;
-        newDownloads.forEach(entry => {
-          if (entry.handle === data.payload.handle) {
-            entry.payload = data.payload;
-            existing = true;
-          }
-        });
-        if(!existing) {
-          newDownloads.push({
-            handle: data.payload.handle,
-            payload: data.payload
-          })
-        }
-        return newDownloads;
-      });
-    });
-  }, [socket]);
-
   const isConnected = () => {
-    return connectState === ConnectState.CONNECT;
+    return connectState === ConnectState.Connect;
   };
 
   return (

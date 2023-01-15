@@ -18,14 +18,14 @@ import {
 import {
   AppSettings,
   DownloadRequest,
-  Controller,
   AuthMethodTypes,
   BasicCredentials,
   AuthMethod,
   DownloadMethod,
   YoutubeDownloadMethod,
   HttpDownloadMethod
-} from "./controller"
+} from "./domain"
+import { Controller } from "./controller"
 import { isBlank } from "./utils"
 
 const CUSTOM_DOWNLOAD_DIR_SELECTION = "system-custom";
