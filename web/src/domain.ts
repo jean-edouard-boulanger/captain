@@ -100,3 +100,25 @@ export interface GeneralNotificationPayload {
 export type GeneralNotificationEvent = DownloadEventBase<"GENERAL_NOTIFICATION", GeneralNotificationPayload>
 export type DownloadTaskEvent = DownloadEventBase<DownloadTaskEventTypes, DownloadTaskEntry>
 export type DownloadEvent = GeneralNotificationEvent | DownloadTaskEvent
+
+export interface GenericErrorResponse {
+  success: false;
+  message: string;
+}
+
+export interface DirectoryEntry {
+  name: string;
+  kind: "f" | "d"
+}
+
+export interface DiscoverDirectorySuccessResponse {
+  success: true;
+  contents: Array<DirectoryEntry>
+}
+
+export type DiscoverDirectoryResponse = DiscoverDirectorySuccessResponse | GenericErrorResponse
+
+export interface ValidateDownloadDirectoryResponse {
+  valid: boolean
+  reason: string
+}

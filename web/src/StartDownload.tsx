@@ -13,7 +13,7 @@ import {
   InputLabel,
   Select,
   MenuItem,
-  Grid
+  Grid, IconButton
 } from "@mui/material";
 import {
   AppSettings,
@@ -25,10 +25,12 @@ import {
   YoutubeDownloadMethod,
   HttpDownloadMethod
 } from "./domain"
+import FolderOpenIcon from '@mui/icons-material/FolderOpen';
 import { Controller } from "./controller"
 import { isBlank } from "./utils"
+import {FileBrowserDialog} from "./FileBrowserDialog";
 
-const CUSTOM_DOWNLOAD_DIR_SELECTION = "system-custom";
+const CUSTOM_DOWNLOAD_DIR_SELECTION = "__SYS_CUSTOM__";
 const BLANK_BASIC_AUTH: BasicCredentials = {method: "basic", username: "", password: ""};
 
 function getDefaultDownloadLocation(settings: AppSettings): [string, string | undefined] {
@@ -44,13 +46,6 @@ function getBlankAuthMethod(authMethodType: AuthMethodTypes): AuthMethod | null 
     return {...BLANK_BASIC_AUTH};
   }
   return null;
-}
-
-interface StartDownloadProps {
-  onStart: (request: DownloadRequest) => void;
-  onCancel: () => void;
-  settings: AppSettings;
-  controller: Controller
 }
 
 interface FormDataErrors {
@@ -96,20 +91,28 @@ function makeDownloadRequest(formData: FormData): DownloadRequest {
   }
 }
 
+interface StartDownloadProps {
+  onStart: (request: DownloadRequest) => void;
+  onCancel: () => void;
+  settings: AppSettings;
+  controller: Controller
+}
+
 export const StartDownload: FunctionComponent<StartDownloadProps> = ({onStart, onCancel, settings, controller}) => {
   const [remoteFileUrl, setRemoteFileUrl] = useState<string | undefined>();
-  const [saveTo, setSaveTo] = useState<string>(() => {
+  const [defaultSaveTo] = useState<string>(() => {
     return getDefaultDownloadLocation(settings)[0]
-  });
+  })
+  const [saveTo, setSaveTo] = useState<string>(defaultSaveTo);
   const [downloadDir, setDownloadDir] = useState<string | undefined>();
   const [authMethodType, setAuthMethodType] = useState<AuthMethodTypes>("none");
   const [authMethod, setAuthMethod] = useState<AuthMethod | null>(null);
   const [formErrors, setFormErrors] = useState<Partial<FormDataErrors>>({})
+  const [browserOpened, setBrowserOpened] = useState<boolean>(false);
 
   useEffect(() => {
     if(isBlank(saveTo)) { return; }
     if(saveTo === CUSTOM_DOWNLOAD_DIR_SELECTION) {
-      setDownloadDir(undefined);
       return;
     }
     setDownloadDir(saveTo);
@@ -195,6 +198,7 @@ export const StartDownload: FunctionComponent<StartDownloadProps> = ({onStart, o
           <Grid item>
             <Box m={1}>
             <TextField value={remoteFileUrl || ""}
+                       variant="filled"
                        label="Remote file URL"
                        error={formErrors.remoteFileUrl !== undefined}
                        onChange={(e) => {setRemoteFileUrl(e.target.value)}}
@@ -204,7 +208,7 @@ export const StartDownload: FunctionComponent<StartDownloadProps> = ({onStart, o
           <Grid item>
             <Box display="flex">
               <Box m={1}>
-                <FormControl style={{minWidth: 200}}>
+                <FormControl variant="filled" style={{minWidth: 200}}>
                   <InputLabel id="save-to-select-label">Save to</InputLabel>
                   <Select labelId="save-to-select-label"
                           value={saveTo}
@@ -229,6 +233,7 @@ export const StartDownload: FunctionComponent<StartDownloadProps> = ({onStart, o
               </Box>
               <Box m={1} flexGrow={1}>
                 <TextField label="Directory"
+                           variant="filled"
                            value={downloadDir || ""}
                            error={formErrors.downloadDir !== undefined}
                            onChange={(e) => {setDownloadDir(e.target.value)}}
@@ -236,12 +241,18 @@ export const StartDownload: FunctionComponent<StartDownloadProps> = ({onStart, o
                            disabled={saveTo !== CUSTOM_DOWNLOAD_DIR_SELECTION}
                            fullWidth />
               </Box>
+              {
+                (saveTo === CUSTOM_DOWNLOAD_DIR_SELECTION) &&
+                  <Box m={1}>
+                    <IconButton onClick={() => setBrowserOpened(true)}><FolderOpenIcon /></IconButton>
+                  </Box>
+              }
             </Box>
           </Grid>
           <Grid item>
             <Box display="flex">
               <Box m={1}>
-                <FormControl style={{minWidth: 200}}>
+                <FormControl variant="filled" style={{minWidth: 200}}>
                   <InputLabel id="auth-mode-select-label">Authentication</InputLabel>
                   <Select labelId="auth-mode-select-label"
                           value={authMethodType}
@@ -253,6 +264,7 @@ export const StartDownload: FunctionComponent<StartDownloadProps> = ({onStart, o
               </Box>
               <Box m={1} hidden={authMethodType !== "basic"}>
                 <TextField label="Username"
+                           variant="filled"
                            error={formErrors.username !== undefined}
                            onChange={(e) => {
                              const basicAuth = authMethod as BasicCredentials;
@@ -264,6 +276,7 @@ export const StartDownload: FunctionComponent<StartDownloadProps> = ({onStart, o
               <Box m={1} hidden={authMethodType !== "basic"}>
                 <TextField label="Password"
                            type="password"
+                           variant="filled"
                            error={formErrors.password !== undefined}
                            onChange={(e) => {
                              const basicAuth = authMethod as BasicCredentials;
@@ -284,6 +297,14 @@ export const StartDownload: FunctionComponent<StartDownloadProps> = ({onStart, o
           Cancel
         </Button>
       </CardActions>
+      <FileBrowserDialog open={browserOpened}
+                         presets={settings.download_directories || []}
+                         controller={controller}
+                         onCancel={() => setBrowserOpened(false)}
+                         onOpen={(selectedPath) => {
+                           setBrowserOpened(false);
+                           setDownloadDir(selectedPath);
+                         }} />
     </Card>
   );
 }

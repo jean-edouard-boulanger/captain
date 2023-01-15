@@ -1,6 +1,15 @@
 import axios from "axios";
 import socketIOClient, { Socket } from "socket.io-client";
-import { ConnectState, DownloadRequest, RecapEvent, DownloadEvent, DownloadTaskEvent, GeneralNotificationEvent } from "./domain"
+import {
+  ConnectState,
+  DownloadRequest,
+  RecapEvent,
+  DownloadEvent,
+  DownloadTaskEvent,
+  GeneralNotificationEvent,
+  DiscoverDirectoryResponse,
+  ValidateDownloadDirectoryResponse
+} from "./domain"
 
 const noopHandler = () => {};
 
@@ -77,11 +86,15 @@ export class Controller {
   startDownload(request: DownloadRequest) {
     this.#socket.emit("start_download", request);
   }
-  async validateDownloadDirectory(directory: string) {
+  async validateDownloadDirectory(directory: string): Promise<ValidateDownloadDirectoryResponse> {
     const resource = `${this.#endpoint}/api/v1/core/validate_download_directory`
     return (await axios.post(resource, {directory})).data;
   }
-  getDownloadedFileUrl(handle: string) {
+  async discoverDirectory(directory: string): Promise<DiscoverDirectoryResponse> {
+    const resource = `${this.#endpoint}/api/v1/core/discover_directory`
+    return (await axios.post(resource, {directory})).data;
+  }
+  getDownloadedFileUrl(handle: string): string {
     return `${this.#endpoint}/download/${handle}`
   }
 }

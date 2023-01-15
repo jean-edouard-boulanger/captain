@@ -206,6 +206,30 @@ async def validate_download_directory_endpoint(request: web.Request):
     return web.json_response({"valid": True})
 
 
+@routes.post("/api/v1/core/discover_directory")
+async def discover_directory_endpoint(request: web.Request):
+    try:
+        payload = await request.json()
+        directory = Path(payload["directory"]).expanduser()
+        if not directory.is_dir():
+            return web.json_response({"success": False, "message": f"{directory} does not exist or is not a directory"})
+        return web.json_response(
+            {
+                "success": True,
+                "contents": sorted(
+                    [
+                        {"name": entry.name, "kind": "d" if entry.is_dir() else "f"}
+                        for entry in directory.iterdir()
+                        if entry.is_dir() or entry.is_file()
+                    ],
+                    key=lambda item: (item["kind"], item["name"]),
+                ),
+            }
+        )
+    except Exception as e:
+        return web.json_response({"success": False, "message": str(e)})
+
+
 def get_arguments_parser():
     parser = argparse.ArgumentParser("captain download manager server")
     parser.add_argument("-c", "--config", type=str, required=True, help="path to configuration file")
