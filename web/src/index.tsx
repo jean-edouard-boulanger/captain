@@ -1,10 +1,10 @@
 import React, {useEffect, useState} from 'react';
 import ReactDOM from 'react-dom/client';
-import App from './App';
 import '@fontsource/roboto';
 import useMediaQuery from '@mui/material/useMediaQuery';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
+import {App} from './App';
 
 const DARK_MODE_SETTING_KEY = "captain.darkMode"
 

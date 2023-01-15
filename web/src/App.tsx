@@ -38,7 +38,7 @@ interface Notification {
   message: string;
 }
 
-const App: FunctionComponent<AppProps> = ({toggleDarkMode, darkMode}) => {
+export const App: FunctionComponent<AppProps> = ({toggleDarkMode, darkMode}) => {
   const [endpoint] = useState<string>(() => getServerEndpoint());
   const [controller, setController] = useState<Controller | null>(null);
   const [connectState, setConnectState] = useState<ConnectState>(ConnectState.Disconnect);
@@ -168,5 +168,3 @@ const App: FunctionComponent<AppProps> = ({toggleDarkMode, darkMode}) => {
     </React.Fragment>
   );
 }
-
-export default App;
