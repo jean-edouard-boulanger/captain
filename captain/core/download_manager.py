@@ -57,6 +57,13 @@ class _Request:
     future_result: Future
 
 
+@dataclass
+class _QueuedDownload:
+    download_handle: DownloadHandle
+    resume_status: DownloadStatus
+    resume_func: Callable[[], None]
+
+
 class DownloadManagerError(CaptainError):
     def __init__(self, error_message: str):
         super().__init__(error_message)
@@ -107,7 +114,8 @@ class DownloadManager(DownloadListenerBase):
     def __init__(self, settings: DownloadManagerSettings):
         self._settings = settings
         self._db = get_persistence(settings.persistence_settings)
-        self._tasks: dict[DownloadHandle, DownloadProcessWrapper] = dict()
+        self._outstanding_tasks: dict[DownloadHandle, DownloadProcessWrapper] = dict()
+        self._queued_downloads: list[_QueuedDownload] = []
         self._requests = Queue()
         self._stop_flag = threading.Event()
         self._observers: list[DownloadManagerObserverBase] = []
@@ -119,7 +127,7 @@ class DownloadManager(DownloadListenerBase):
                 entry.state.schedule_handle = self._scheduler.schedule_unsafe(
                     at=entry.user_request.start_at,
                     action=partial(
-                        self._queue_request,
+                        self._run_soon,
                         handler=self._handle_start_download,
                         args=(entry.handle,),
                     ),
@@ -130,28 +138,40 @@ class DownloadManager(DownloadListenerBase):
         return self._settings
 
     @property
-    def public_api_enabled(self):
+    def public_api_enabled(self) -> bool:
         return not self._stop_flag.is_set()
 
     @public_endpoint
-    def start_download(self, request: DownloadRequest, blocking: bool | None = False):
-        return self._queue_request(self._handle_schedule_download, args=(request,), blocking=blocking)
+    def start_download(self, request: DownloadRequest) -> None:
+        self._run_soon(self._handle_add_download, args=(request,))
 
     @public_endpoint
-    def reschedule_download(self, handle: DownloadHandle, start_at: datetime):
-        return self._queue_request(self._handle_reschedule_download, args=(handle, start_at))
+    def reschedule_download(self, handle: DownloadHandle, start_at: datetime) -> None:
+        self._run_soon(self._handle_reschedule_download, args=(handle, start_at))
 
     @public_endpoint
-    def stop_download(self, handle: DownloadHandle, blocking: bool | None = False):
-        return self._queue_request(self._handle_stop_download, args=(handle,), blocking=blocking)
+    def stop_download(self, handle: DownloadHandle) -> None:
+        self._run_soon(self._handle_stop_download, args=(handle,))
 
     @public_endpoint
-    def pause_download(self, handle: DownloadHandle, blocking: bool | None = False):
-        return self._queue_request(self._handle_pause_download, args=(handle,), blocking=blocking)
+    def pause_download(self, handle: DownloadHandle) -> None:
+        self._run_soon(self._handle_pause_download, args=(handle,))
 
     @public_endpoint
-    def resume_download(self, handle: DownloadHandle, blocking: bool | None = False):
-        return self._queue_request(self._handle_resume_download, args=(handle,), blocking=blocking)
+    def resume_download(self, handle: DownloadHandle) -> None:
+        self._run_soon(
+            handler=partial(
+                self._queue_download, handle=handle, resume_func=partial(self._handle_resume_download, handle)
+            )
+        )
+
+    @public_endpoint
+    def retry_download(self, handle: DownloadHandle) -> None:
+        self._run_soon(
+            handler=partial(
+                self._queue_download, handle=handle, resume_func=partial(self._handle_retry_download, handle)
+            )
+        )
 
     @public_endpoint
     def remove_download(
@@ -160,30 +180,26 @@ class DownloadManager(DownloadListenerBase):
         delete_file: bool | None = False,
         blocking: bool | None = False,
     ):
-        return self._queue_request(self._handle_remove_download, args=(handle, delete_file), blocking=blocking)
+        return self._run_soon(self._handle_remove_download, args=(handle, delete_file), blocking=blocking)
 
     @public_endpoint
     def get_download(self, handle: DownloadHandle, blocking: bool | None = False):
-        return self._queue_request(self._handle_get_download, args=(handle,), blocking=blocking)
+        return self._run_soon(self._handle_get_download, args=(handle,), blocking=blocking)
 
     @public_endpoint
     def get_download_file_path(self, handle: DownloadHandle, blocking: bool | None = False):
-        return self._queue_request(self._handle_get_download_file_path, args=(handle,), blocking=blocking)
+        return self._run_soon(self._handle_get_download_file_path, args=(handle,), blocking=blocking)
 
     @public_endpoint
     def get_downloads(self, blocking: bool | None = False):
-        return self._queue_request(self._handle_get_downloads, blocking=blocking)
-
-    @public_endpoint
-    def retry_download(self, handle: DownloadHandle, blocking: bool | None = False):
-        return self._queue_request(self._handle_retry_download, args=(handle,), blocking=blocking)
+        return self._run_soon(self._handle_get_downloads, blocking=blocking)
 
     @public_endpoint
     def add_observer(self, observer: DownloadManagerObserverBase):
         self._observers.append(observer)
 
     def download_started(self, update_time: datetime, handle: DownloadHandle, metadata: DownloadMetadata):
-        return self._queue_request(self._handle_download_started, args=(update_time, handle, metadata))
+        return self._run_soon(self._handle_download_started, args=(update_time, handle, metadata))
 
     def progress_changed(
         self,
@@ -192,46 +208,28 @@ class DownloadManager(DownloadListenerBase):
         downloaded_bytes: float,
         average_rate: float,
     ):
-        return self._queue_request(
+        return self._run_soon(
             self._handle_progress_changed,
             args=(update_time, handle, downloaded_bytes, average_rate),
         )
 
     def download_complete(self, update_time: datetime, handle: DownloadHandle):
-        return self._queue_request(self._handle_download_complete, args=(update_time, handle))
+        return self._run_soon(self._handle_download_complete, args=(update_time, handle))
 
     def download_stopped(self, update_time: datetime, handle: DownloadHandle):
-        return self._queue_request(self._handle_download_stopped, args=(update_time, handle))
+        return self._run_soon(self._handle_download_stopped, args=(update_time, handle))
 
     def download_errored(self, update_time: datetime, handle: DownloadHandle, error_info: ErrorInfo):
-        return self._queue_request(self._handle_download_errored, args=(update_time, handle, error_info))
-
-    def _handle_schedule_download(self, request: DownloadRequest) -> DownloadHandle:
-        handle = DownloadHandle.make()
-        invariant(not self._db.has_entry(handle))
-        work_dir = self.settings.temp_download_dir / f"{handle}.captain"
-        logger.debug(f"creating work directory {work_dir} for download handle={handle}")
-        work_dir.mkdir()
-        entry = DownloadEntry(
-            handle=handle,
-            user_request=request,
-            state=DownloadState(status=DownloadStatus.SCHEDULED, work_dir=work_dir),
-        )
-        start_at = request.start_at if request.start_at else datetime.now(pytz.utc)
-        schedule_handle = self._defer_request(start_at, self._handle_start_download, args=(handle,))
-        logger.debug(f"got handle {schedule_handle} for scheduled event")
-        entry.state.schedule_handle = schedule_handle
-        self._db.persist_entry(entry)
-        self._update_observers(EventType.DOWNLOAD_SCHEDULED, ExternalDownloadEntry.from_internal(entry))
-        return handle
+        return self._run_soon(self._handle_download_errored, args=(update_time, handle, error_info))
 
     def _hard_download_task_cleanup(self, handle: DownloadHandle, post_action: str | None = None) -> None:
-        task = self._tasks.get(handle)
-        if task and task.is_alive():
-            logger.info(f"killing download {handle} subprocess")
-            task.kill()
-            task.join()
-            del self._tasks[handle]
+        task = self._outstanding_tasks.get(handle)
+        if task:
+            if task.is_alive():
+                logger.info(f"killing download {handle} subprocess")
+                task.kill()
+                task.join()
+            self._free_outstanding_task(handle)
         if self._db.has_entry(handle):
             task_work_dir = self._db.get_entry(handle).state.work_dir
             if task_work_dir and task_work_dir.is_dir():
@@ -267,6 +265,64 @@ class DownloadManager(DownloadListenerBase):
                 )
             raise
 
+    @property
+    def _has_capacity(self):
+        return (
+            not self._settings.max_outstanding_tasks
+            or len(self._outstanding_tasks) < self._settings.max_outstanding_tasks
+        )
+
+    def _schedule(self):
+        if self._has_capacity and self._queued_downloads:
+            queued_download = self._queued_downloads.pop(0)
+            with self._db.scoped_entry(queued_download.download_handle) as entry:
+                entry.state.status = queued_download.resume_status
+            queued_download.resume_func()
+
+    def _schedule_soon(self):
+        self._run_soon(self._schedule)
+
+    def _free_outstanding_task(self, handle: DownloadHandle) -> None:
+        invariant(handle in self._outstanding_tasks)
+        invariant(not self._outstanding_tasks[handle].is_alive())
+        del self._outstanding_tasks[handle]
+        # Free-ing an outstanding task means we can schedule a queued task
+        self._schedule_soon()
+
+    def _queue_download(self, handle: DownloadHandle, resume_func: Callable[[], None]):
+        with self._download_error_handler(handle):
+            invariant(handle not in self._outstanding_tasks)
+            with self._db.scoped_entry(handle) as entry:
+                current_status = entry.state.status
+                entry.state.status = DownloadStatus.QUEUED
+                self._queued_downloads.append(_QueuedDownload(handle, current_status, resume_func))
+                self._schedule_soon()
+                self._update_observers(EventType.DOWNLOAD_QUEUED, ExternalDownloadEntry.from_internal(entry))
+
+    def _handle_add_download(self, request: DownloadRequest) -> DownloadHandle:
+        handle = DownloadHandle.make()
+        invariant(not self._db.has_entry(handle))
+        work_dir = self.settings.temp_download_dir / f"{handle}.captain"
+        logger.debug(f"creating work directory {work_dir} for download handle={handle}")
+        work_dir.mkdir()
+        entry = DownloadEntry(
+            handle=handle,
+            user_request=request,
+            state=DownloadState(status=DownloadStatus.SCHEDULED, work_dir=work_dir),
+        )
+        start_at = request.start_at if request.start_at else datetime.now(pytz.utc)
+        schedule_handle = self._run_later(
+            start_at=start_at,
+            handler=partial(
+                self._queue_download, handle=handle, resume_func=partial(self._handle_start_download, handle)
+            ),
+        )
+        logger.debug(f"got handle {schedule_handle} for scheduled event")
+        entry.state.schedule_handle = schedule_handle
+        self._db.persist_entry(entry)
+        self._update_observers(EventType.DOWNLOAD_SCHEDULED, ExternalDownloadEntry.from_internal(entry))
+        return handle
+
     def _handle_reschedule_download(self, handle: DownloadHandle, start_at: datetime):
         logger.info(f"handling reschedule download request handle={handle} start_at={start_at}")
         with self._download_error_handler(handle):
@@ -276,27 +332,25 @@ class DownloadManager(DownloadListenerBase):
                 if not entry.state.can_be_rescheduled:
                     raise DownloadManagerError("cannot reschedule download")
                 invariant(entry.state.schedule_handle is not None)
-                self._scheduler.cancel(entry.state.schedule_handle)
-                entry.user_request.start_at = start_at
-                entry.state.schedule_handle = self._defer_request(start_at, self._handle_start_download, args=(handle,))
+                self._scheduler.reschedule(entry.state.schedule_handle, at=start_at)
             self._update_observers(EventType.DOWNLOAD_SCHEDULED, ExternalDownloadEntry.from_internal(entry))
 
     def _handle_start_download(self, handle: DownloadHandle) -> DownloadHandle:
         logger.info(f"handling start download request handle={handle}")
         with self._download_error_handler(handle):
             invariant(self._db.has_entry(handle))
-            invariant(handle not in self._tasks)
+            invariant(handle not in self._outstanding_tasks)
             with self._db.scoped_entry(handle) as entry:
                 entry.state.schedule_handle = None
                 entry.state.status = DownloadStatus.PENDING
-                self._tasks[handle] = create_download_process(
+                self._outstanding_tasks[handle] = create_download_process(
                     handle=handle,
                     download_request=entry.user_request,
                     existing_metadata=entry.state.metadata,
                     work_dir=entry.state.work_dir,
                     listener=self._listener_bridge.make_listener(),
                 )
-                self._tasks[handle].start()
+                self._outstanding_tasks[handle].start()
                 return handle
 
     def _handle_retry_download(self, handle: DownloadHandle):
@@ -312,15 +366,15 @@ class DownloadManager(DownloadListenerBase):
                 logger.debug(f"clearing work directory {work_dir}")
                 empty_directory(work_dir)
                 entry.state = DownloadState(status=DownloadStatus.PENDING, work_dir=work_dir)
-                invariant(handle not in self._tasks)
-                self._tasks[handle] = create_download_process(
+                invariant(handle not in self._outstanding_tasks)
+                self._outstanding_tasks[handle] = create_download_process(
                     handle=handle,
                     download_request=entry.user_request,
                     existing_metadata=entry.state.metadata,
                     work_dir=work_dir,
                     listener=self._listener_bridge.make_listener(),
                 )
-                self._tasks[handle].start()
+                self._outstanding_tasks[handle].start()
 
     def _handle_stop_download(self, handle: DownloadHandle) -> None:
         logger.info(f"handling stop download request handle={handle}")
@@ -334,11 +388,11 @@ class DownloadManager(DownloadListenerBase):
                 if entry.state.schedule_handle is not None:
                     self._scheduler.cancel(entry.state.schedule_handle)
                     entry.state.schedule_handle = None
-                task = self._tasks.get(handle)
+                task = self._outstanding_tasks.get(handle)
                 if task is None:
                     invariant(entry.state.status in {DownloadStatus.PAUSED, DownloadStatus.SCHEDULED})
                     entry.state.requested_status = DownloadStatus.STOPPED
-                    self._queue_request(self._handle_download_stopped, args=(datetime.now(), handle))
+                    self._run_soon(self._handle_download_stopped, args=(datetime.now(), handle))
                     return
                 task.stop()
                 entry.state.requested_status = DownloadStatus.STOPPED
@@ -351,8 +405,8 @@ class DownloadManager(DownloadListenerBase):
             with self._db.scoped_entry(handle) as entry:
                 if not entry.state.can_be_paused:
                     raise DownloadManagerError("cannot pause task")
-                invariant(handle in self._tasks)
-                task = self._tasks[handle]
+                invariant(handle in self._outstanding_tasks)
+                task = self._outstanding_tasks[handle]
                 task.stop()
                 entry.state.requested_status = DownloadStatus.PAUSED
                 entry.state.last_update_time = datetime.now()
@@ -367,15 +421,15 @@ class DownloadManager(DownloadListenerBase):
                     raise DownloadManagerError("cannot resume task")
                 entry.state.requested_status = DownloadStatus.ACTIVE
                 invariant(entry.state.metadata is not None)
-                invariant(handle not in self._tasks)
-                self._tasks[handle] = create_download_process(
+                invariant(handle not in self._outstanding_tasks)
+                self._outstanding_tasks[handle] = create_download_process(
                     handle=handle,
                     download_request=entry.user_request.copy(deep=True),
                     existing_metadata=entry.state.metadata,
                     work_dir=entry.state.work_dir,
                     listener=self._listener_bridge.make_listener(),
                 )
-                self._tasks[handle].start()
+                self._outstanding_tasks[handle].start()
 
     def _handle_remove_download(self, handle: DownloadHandle, delete_file: bool):
         logger.info(f"handling remove download request handle={handle} delete_file={delete_file}")
@@ -383,9 +437,15 @@ class DownloadManager(DownloadListenerBase):
             if not self._db.has_entry(handle):
                 raise DownloadManagerError(f"download entry not found: {handle.handle}")
             entry = self._db.get_entry(handle)
+            if entry.state.status == DownloadStatus.QUEUED:
+                self._queued_downloads = [
+                    queued_downloads
+                    for queued_downloads in self._queued_downloads
+                    if queued_downloads.download_handle != entry.handle
+                ]
             if delete_file and entry.state.file_location and entry.state.file_location.is_file():
                 logger.info(f"removing downloaded file {entry.state.file_location}")
-                self._queue_request(
+                self._run_soon(
                     _cleanup_files,
                     args=([entry.state.file_location],),
                     kwargs={"permanent": not self._settings.send_files_to_trash},
@@ -453,9 +513,9 @@ class DownloadManager(DownloadListenerBase):
         )
         with self._download_error_handler(handle):
             invariant(self._db.has_entry(handle))
-            invariant(handle in self._tasks)
-            self._tasks[handle].join()
-            del self._tasks[handle]
+            invariant(handle in self._outstanding_tasks)
+            self._outstanding_tasks[handle].join()
+            self._free_outstanding_task(handle)
             with self._db.scoped_entry(handle) as entry:
                 entry.state.status = DownloadStatus.ERROR
                 entry.state.end_time = datetime.now()
@@ -472,9 +532,9 @@ class DownloadManager(DownloadListenerBase):
         logger.info(f"handling download complete event handle={handle} update_time={update_time.isoformat()}")
         with self._download_error_handler(handle):
             invariant(self._db.has_entry(handle))
-            invariant(handle in self._tasks)
-            self._tasks[handle].join()
-            del self._tasks[handle]
+            invariant(handle in self._outstanding_tasks)
+            self._outstanding_tasks[handle].join()
+            self._free_outstanding_task(handle)
             with self._db.scoped_entry(handle) as entry:
                 file_size = entry.state.metadata.file_size
                 invariant(file_size is None or entry.state.downloaded_bytes == file_size)
@@ -505,11 +565,12 @@ class DownloadManager(DownloadListenerBase):
             invariant(self._db.has_entry(handle))
             with self._db.scoped_entry(handle) as entry:
                 invariant(
-                    handle in self._tasks or entry.state.status in {DownloadStatus.PAUSED, DownloadStatus.SCHEDULED}
+                    handle in self._outstanding_tasks
+                    or entry.state.status in {DownloadStatus.PAUSED, DownloadStatus.SCHEDULED}
                 )
-                if handle in self._tasks:
-                    self._tasks[handle].join()
-                    del self._tasks[handle]
+                if handle in self._outstanding_tasks:
+                    self._outstanding_tasks[handle].join()
+                    self._free_outstanding_task(handle)
                 requested_status = entry.state.requested_status
                 invariant(requested_status is not None)
                 invariant(requested_status in {DownloadStatus.STOPPED, DownloadStatus.PAUSED})
@@ -547,7 +608,7 @@ class DownloadManager(DownloadListenerBase):
                 )
                 logger.debug(f"progress for task {handle} changed: {downloaded_bytes} bytes")
 
-    def _queue_request(
+    def _run_soon(
         self,
         handler: Callable,
         args: tuple | None = None,
@@ -563,7 +624,7 @@ class DownloadManager(DownloadListenerBase):
             return request.future_result.get()
         return request.future_result
 
-    def _defer_request(
+    def _run_later(
         self,
         start_at: datetime,
         handler: Callable,
@@ -573,7 +634,7 @@ class DownloadManager(DownloadListenerBase):
         return self._scheduler.schedule(
             at=start_at,
             action=partial(
-                self._queue_request,
+                self._run_soon,
                 handler=handler,
                 args=args,
                 kwargs=kwargs,
@@ -589,10 +650,10 @@ class DownloadManager(DownloadListenerBase):
                 entry.state.schedule_handle = None
             elif entry.state.can_be_paused:
                 logger.info(f"pausing task {entry.handle}")
-                self._queue_request(self._handle_pause_download, args=(entry.handle,))
+                self._run_soon(self._handle_pause_download, args=(entry.handle,))
             elif entry.state.can_be_stopped:
                 logger.info(f"stopping task {entry.handle}")
-                self._queue_request(self._handle_stop_download, args=(entry.handle,))
+                self._run_soon(self._handle_stop_download, args=(entry.handle,))
 
     def _check_enabled(self):
         if self._stop_flag.is_set():

@@ -10,6 +10,7 @@ download_directories:
     label: Movies
   - directory: ~/Documents
     label: Documents
+max_outstanding_tasks: 1
 shutdown_timeout: 10
 send_files_to_trash: true
 persistence_settings:
