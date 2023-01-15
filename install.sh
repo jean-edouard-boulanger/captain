@@ -33,7 +33,7 @@ ${venv_python} setup.py build install
 captain_web_dir="${captain_dir}/web"
 echo "installing captain web application"
 mkdir -p ${captain_web_dir}
-cp -r web/src/ web/public/ web/.env web/package.json web/package-lock.json web/run-prod.sh ${captain_web_dir}/
+cp -r web/src/ web/public/ web/.env web/package.json web/package-lock.json web/tsconfig.json web/run-prod.sh ${captain_web_dir}/
 (cd ${captain_web_dir} && npm install)
 (cd ${captain_web_dir} && npm run build)
 
