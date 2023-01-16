@@ -45,6 +45,9 @@ class HttpDownloadRequest(BaseModel):
     def remote_file_name(self) -> str:
         return unquote(os.path.basename(self.remote_file_url))
 
+    def strip_credentials(self):
+        self.auth_method = None
+
 
 class YoutubeAuth(BaseModel):
     username: str
@@ -60,6 +63,9 @@ class YoutubeDownloadRequest(BaseModel):
     def remote_file_name(self) -> str:
         return unquote(os.path.basename(self.remote_file_url))
 
+    def strip_credentials(self):
+        self.auth = None
+
 
 DownloadMethodType = Union[HttpDownloadRequest, YoutubeDownloadRequest]
 DownloadMethodChoiceType = Annotated[DownloadMethodType, Field(discriminator="method")]
@@ -73,6 +79,9 @@ class DownloadRequest(BaseModel):
     @property
     def remote_file_name(self) -> str:
         return self.download_method.remote_file_name
+
+    def strip_credentials(self) -> None:
+        self.download_method.strip_credentials()
 
 
 class ErrorInfo(BaseModel):

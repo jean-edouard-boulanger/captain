@@ -17,13 +17,13 @@ class PersistenceBase(Protocol):
     def get_entry(self, handle: DownloadHandle) -> DownloadEntry:
         raise NotImplementedError("must implement 'get_entry'")
 
-    def remove_entry(self, handle):
+    def remove_entry(self, handle) -> None:
         raise NotImplementedError("must implement 'remove_entry'")
 
-    def persist_entry(self, entry: DownloadEntry):
+    def persist_entry(self, entry: DownloadEntry) -> None:
         raise NotImplementedError("must implement 'save_entry'")
 
-    def flush(self):
+    def flush(self) -> None:
         raise NotImplementedError("must implement 'flush'")
 
     @contextmanager

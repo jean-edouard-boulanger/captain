@@ -721,4 +721,7 @@ class DownloadManager(DownloadListenerBase):
         self._scheduler.stop()
         self._scheduler.join()
         logger.info("persisting download manager state")
+        for entry in self._db.get_all_entries():
+            entry.user_request.strip_credentials()
+            self._db.persist_entry(entry)
         self._db.flush()
