@@ -62,10 +62,20 @@ export enum ConnectState {
   ReconnectFailed = "reconnect_failed"
 }
 
+export type DownloadTaskStatusTypes =
+  | "NEW"
+  | "QUEUED"
+  | "STARTING"
+  | "ACTIVE"
+  | "PAUSED"
+  | "COMPLETE"
+  | "STOPPED"
+  | "ERROR"
+
 export interface DownloadTaskEntry {
   handle: string;
   file_name: string;
-  status: string;
+  status: DownloadTaskStatusTypes;
   is_final: boolean;
   progress_pc: number;
   current_rate: number;
@@ -82,6 +92,7 @@ export interface RecapEvent {
 export type DownloadTaskEventTypes =
   | "DOWNLOAD_ADDED"
   | "DOWNLOAD_QUEUED"
+  | "DOWNLOAD_STARTING"
   | "DOWNLOAD_STARTED"
   | "PROGRESS_CHANGED"
   | "DOWNLOAD_COMPLETE"

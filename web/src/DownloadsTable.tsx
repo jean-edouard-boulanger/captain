@@ -1,6 +1,5 @@
 import {
   Chip,
-  Divider,
   IconButton,
   LinearProgress,
   ListItemIcon,
@@ -24,7 +23,6 @@ import ClearIcon from "@mui/icons-material/Clear";
 import GetAppIcon from '@mui/icons-material/GetApp';
 import DeleteForeverIcon from '@mui/icons-material/DeleteForever';
 import React, {useState, FunctionComponent} from 'react';
-import {format as formatDate} from 'date-fns';
 import {DownloadTaskEntry} from "./domain"
 import {Controller} from "./controller"
 
@@ -193,6 +191,7 @@ export const DownloadsTable: FunctionComponent<DownloadsTableProps> = ({download
           downloads.map(payload => {
             const handle = payload.handle;
             const downloadStatus = payload.status;
+            console.log(downloadStatus);
             return (
               <TableRow key={payload.handle}>
                 <TableCell width={34}>
@@ -209,9 +208,12 @@ export const DownloadsTable: FunctionComponent<DownloadsTableProps> = ({download
                   {payload.file_name}
                 </TableCell>
                 <TableCell>
-                  {(payload.progress_pc !== null) &&
+                  {(downloadStatus === "ACTIVE" && payload.progress_pc !== null) &&
                     <LinearProgress variant="determinate"
                                     value={payload.progress_pc * 100} />
+                  }
+                  {(downloadStatus === "STARTING") &&
+                    <LinearProgress />
                   }
                 </TableCell>
                 <TableCell style={{minWidth: 50, maxWidth: 50}}>

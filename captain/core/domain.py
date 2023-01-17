@@ -110,7 +110,7 @@ class ErrorInfo(BaseModel):
 class DownloadStatus(str, enum.Enum):
     NEW = "NEW"
     QUEUED = "QUEUED"
-    PENDING = "PENDING"
+    STARTING = "STARTING"
     ACTIVE = "ACTIVE"
     PAUSED = "PAUSED"
     COMPLETE = "COMPLETE"
@@ -214,6 +214,7 @@ class GeneralNotification(BaseModel):
 class EventType(str, enum.Enum):
     DOWNLOAD_QUEUED = "DOWNLOAD_QUEUED"
     DOWNLOAD_ADDED = "DOWNLOAD_ADDED"
+    DOWNLOAD_STARTING = "DOWNLOAD_STARTING"
     DOWNLOAD_STARTED = "DOWNLOAD_STARTED"
     PROGRESS_CHANGED = "PROGRESS_CHANGED"
     DOWNLOAD_COMPLETE = "DOWNLOAD_COMPLETE"

@@ -301,13 +301,13 @@ class DownloadManager(DownloadListenerBase):
         self._update_observers(EventType.DOWNLOAD_ADDED, ExternalDownloadEntry.from_internal(entry))
         return handle
 
-    def _handle_start_download(self, handle: DownloadHandle) -> DownloadHandle:
+    def _handle_start_download(self, handle: DownloadHandle):
         logger.info(f"handling start download request handle={handle}")
         with self._download_error_handler(handle):
             invariant(self._db.has_entry(handle))
             invariant(handle not in self._outstanding_tasks)
             with self._db.scoped_entry(handle) as entry:
-                entry.state.status = DownloadStatus.PENDING
+                entry.state.status = DownloadStatus.STARTING
                 self._outstanding_tasks[handle] = create_download_process(
                     handle=handle,
                     download_request=entry.user_request,
@@ -316,7 +316,7 @@ class DownloadManager(DownloadListenerBase):
                     listener=self._listener_bridge.make_listener(),
                 )
                 self._outstanding_tasks[handle].start()
-                return handle
+            self._update_observers(EventType.DOWNLOAD_STARTING, ExternalDownloadEntry.from_internal(entry))
 
     def _handle_retry_download(self, handle: DownloadHandle):
         logger.info(f"handling retry download request handle={handle}")
@@ -330,7 +330,7 @@ class DownloadManager(DownloadListenerBase):
                 invariant(work_dir.exists())
                 logger.debug(f"clearing work directory {work_dir}")
                 empty_directory(work_dir)
-                entry.state = DownloadState(status=DownloadStatus.PENDING, work_dir=work_dir)
+                entry.state = DownloadState(status=DownloadStatus.STARTING, work_dir=work_dir)
                 invariant(handle not in self._outstanding_tasks)
                 self._outstanding_tasks[handle] = create_download_process(
                     handle=handle,
@@ -340,6 +340,7 @@ class DownloadManager(DownloadListenerBase):
                     listener=self._listener_bridge.make_listener(),
                 )
                 self._outstanding_tasks[handle].start()
+            self._update_observers(EventType.DOWNLOAD_STARTING, ExternalDownloadEntry.from_internal(entry))
 
     def _handle_stop_download(self, handle: DownloadHandle) -> None:
         logger.info(f"handling stop download request handle={handle}")
@@ -454,9 +455,9 @@ class DownloadManager(DownloadListenerBase):
             with self._db.scoped_entry(handle) as entry:
                 invariant(entry.state.metadata is None or entry.state.status == DownloadStatus.PAUSED)
                 invariant(entry.state.start_time is None or entry.state.status == DownloadStatus.PAUSED)
-                invariant(entry.state.status in {DownloadStatus.PENDING, DownloadStatus.PAUSED})
-                if entry.state.status == DownloadStatus.PENDING:
-                    logger.debug(f"task status is pending, setting metadata: {metadata}")
+                invariant(entry.state.status in {DownloadStatus.STARTING, DownloadStatus.PAUSED})
+                if entry.state.status == DownloadStatus.STARTING:
+                    logger.debug(f"task status is 'starting', setting metadata: {metadata}")
                     entry.state.metadata = metadata
                     entry.state.start_time = datetime.now()
                 entry.state.last_update_time = update_time
