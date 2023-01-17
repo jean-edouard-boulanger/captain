@@ -124,8 +124,3 @@ def invariant(check: bool):
     )
     logger.error(metadata.describe())
     _INSTALLED_HANDLER(metadata)
-
-
-def required_value(opt: Any | None) -> Any:
-    invariant(opt is not None)
-    return opt

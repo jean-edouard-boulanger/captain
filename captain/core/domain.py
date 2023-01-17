@@ -108,8 +108,8 @@ class ErrorInfo(BaseModel):
 
 
 class DownloadStatus(str, enum.Enum):
+    NEW = "NEW"
     QUEUED = "QUEUED"
-    SCHEDULED = "SCHEDULED"
     PENDING = "PENDING"
     ACTIVE = "ACTIVE"
     PAUSED = "PAUSED"
@@ -129,7 +129,6 @@ class DownloadState(BaseModel):
     status: DownloadStatus
     work_dir: Path
     metadata: DownloadMetadata | None = None
-    schedule_handle: int | None = None
     downloaded_bytes: int | None = None
     current_rate: float | None = None
     file_location: Path | None = None
@@ -176,17 +175,13 @@ class DownloadState(BaseModel):
     @property
     def can_be_stopped(self) -> bool:
         return (
-            self.status in {DownloadStatus.ACTIVE, DownloadStatus.PAUSED, DownloadStatus.SCHEDULED}
+            self.status in {DownloadStatus.ACTIVE, DownloadStatus.PAUSED, DownloadStatus.NEW}
             and self.requested_status is None
         )
 
     @property
     def can_be_retried(self) -> bool:
         return self.status in {DownloadStatus.STOPPED, DownloadStatus.ERROR}
-
-    @property
-    def can_be_rescheduled(self) -> bool:
-        return self.status == DownloadStatus.SCHEDULED
 
     @property
     def can_be_downloaded(self) -> bool:
@@ -218,7 +213,7 @@ class GeneralNotification(BaseModel):
 
 class EventType(str, enum.Enum):
     DOWNLOAD_QUEUED = "DOWNLOAD_QUEUED"
-    DOWNLOAD_SCHEDULED = "DOWNLOAD_SCHEDULED"
+    DOWNLOAD_ADDED = "DOWNLOAD_ADDED"
     DOWNLOAD_STARTED = "DOWNLOAD_STARTED"
     PROGRESS_CHANGED = "PROGRESS_CHANGED"
     DOWNLOAD_COMPLETE = "DOWNLOAD_COMPLETE"

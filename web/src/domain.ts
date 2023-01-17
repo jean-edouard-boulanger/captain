@@ -40,7 +40,6 @@ export type DownloadMethod = HttpDownloadMethod | YoutubeDownloadMethod | Torren
 export interface DownloadRequest {
   download_dir: string;
   download_method: DownloadMethod
-  start_at?: null;
 }
 
 export interface DownloadDirectory {
@@ -69,7 +68,6 @@ export interface DownloadTaskEntry {
   status: string;
   is_final: boolean;
   progress_pc: number;
-  time_scheduled: Date;
   current_rate: number;
   error_message: string;
   valid_actions: Array<string>;
@@ -82,7 +80,8 @@ export interface RecapEvent {
 }
 
 export type DownloadTaskEventTypes =
-  | "DOWNLOAD_SCHEDULED"
+  | "DOWNLOAD_ADDED"
+  | "DOWNLOAD_QUEUED"
   | "DOWNLOAD_STARTED"
   | "PROGRESS_CHANGED"
   | "DOWNLOAD_COMPLETE"

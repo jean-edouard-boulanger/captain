@@ -13,7 +13,6 @@ from pathlib import Path
 from queue import Queue
 from typing import Any, Protocol
 
-import pytz
 from send2trash import send2trash
 
 from .client_view import DownloadEntry as ExternalDownloadEntry
@@ -36,10 +35,9 @@ from .download_process import DownloadProcessWrapper, create_download_process
 from .errors import CaptainError
 from .fs import empty_directory, remove_directory
 from .future import Future
-from .invariant import invariant, required_value
+from .invariant import invariant
 from .logging import get_logger
 from .persistence_factory import get_persistence
-from .scheduler import Scheduler, ThreadedScheduler
 from .serialization import serialize
 
 logger = get_logger()
@@ -119,19 +117,7 @@ class DownloadManager(DownloadListenerBase):
         self._requests = Queue()
         self._stop_flag = threading.Event()
         self._observers: list[DownloadManagerObserverBase] = []
-        self._scheduler = ThreadedScheduler(Scheduler())
         self._listener_bridge = ThreadedDownloadListenerBridge(self)
-        for entry in self._db.get_all_entries():
-            if entry.user_request.start_at is not None and entry.state.status == DownloadStatus.SCHEDULED:
-                invariant(entry.state.schedule_handle is None)
-                entry.state.schedule_handle = self._scheduler.schedule_unsafe(
-                    at=entry.user_request.start_at,
-                    action=partial(
-                        self._run_soon,
-                        handler=self._handle_start_download,
-                        args=(entry.handle,),
-                    ),
-                )
 
     @property
     def settings(self) -> DownloadManagerSettings:
@@ -144,10 +130,6 @@ class DownloadManager(DownloadListenerBase):
     @public_endpoint
     def start_download(self, request: DownloadRequest) -> None:
         self._run_soon(self._handle_add_download, args=(request,))
-
-    @public_endpoint
-    def reschedule_download(self, handle: DownloadHandle, start_at: datetime) -> None:
-        self._run_soon(self._handle_reschedule_download, args=(handle, start_at))
 
     @public_endpoint
     def stop_download(self, handle: DownloadHandle) -> None:
@@ -308,32 +290,16 @@ class DownloadManager(DownloadListenerBase):
         entry = DownloadEntry(
             handle=handle,
             user_request=request,
-            state=DownloadState(status=DownloadStatus.SCHEDULED, work_dir=work_dir),
+            state=DownloadState(status=DownloadStatus.NEW, work_dir=work_dir),
         )
-        start_at = request.start_at if request.start_at else datetime.now(pytz.utc)
-        schedule_handle = self._run_later(
-            start_at=start_at,
+        self._run_soon(
             handler=partial(
                 self._queue_download, handle=handle, resume_func=partial(self._handle_start_download, handle)
             ),
         )
-        logger.debug(f"got handle {schedule_handle} for scheduled event")
-        entry.state.schedule_handle = schedule_handle
         self._db.persist_entry(entry)
-        self._update_observers(EventType.DOWNLOAD_SCHEDULED, ExternalDownloadEntry.from_internal(entry))
+        self._update_observers(EventType.DOWNLOAD_ADDED, ExternalDownloadEntry.from_internal(entry))
         return handle
-
-    def _handle_reschedule_download(self, handle: DownloadHandle, start_at: datetime):
-        logger.info(f"handling reschedule download request handle={handle} start_at={start_at}")
-        with self._download_error_handler(handle):
-            if not self._db.has_entry(handle):
-                raise DownloadManagerError(f"download entry not found: {handle.handle}")
-            with self._db.scoped_entry(handle) as entry:
-                if not entry.state.can_be_rescheduled:
-                    raise DownloadManagerError("cannot reschedule download")
-                invariant(entry.state.schedule_handle is not None)
-                self._scheduler.reschedule(entry.state.schedule_handle, at=start_at)
-            self._update_observers(EventType.DOWNLOAD_SCHEDULED, ExternalDownloadEntry.from_internal(entry))
 
     def _handle_start_download(self, handle: DownloadHandle) -> DownloadHandle:
         logger.info(f"handling start download request handle={handle}")
@@ -341,7 +307,6 @@ class DownloadManager(DownloadListenerBase):
             invariant(self._db.has_entry(handle))
             invariant(handle not in self._outstanding_tasks)
             with self._db.scoped_entry(handle) as entry:
-                entry.state.schedule_handle = None
                 entry.state.status = DownloadStatus.PENDING
                 self._outstanding_tasks[handle] = create_download_process(
                     handle=handle,
@@ -385,12 +350,9 @@ class DownloadManager(DownloadListenerBase):
                 if not entry.state.can_be_stopped:
                     raise DownloadManagerError("cannot stop task")
                 entry.state.last_update_time = datetime.now()
-                if entry.state.schedule_handle is not None:
-                    self._scheduler.cancel(entry.state.schedule_handle)
-                    entry.state.schedule_handle = None
                 task = self._outstanding_tasks.get(handle)
                 if task is None:
-                    invariant(entry.state.status in {DownloadStatus.PAUSED, DownloadStatus.SCHEDULED})
+                    invariant(entry.state.status in {DownloadStatus.PAUSED, DownloadStatus.NEW})
                     entry.state.requested_status = DownloadStatus.STOPPED
                     self._run_soon(self._handle_download_stopped, args=(datetime.now(), handle))
                     return
@@ -566,7 +528,7 @@ class DownloadManager(DownloadListenerBase):
             with self._db.scoped_entry(handle) as entry:
                 invariant(
                     handle in self._outstanding_tasks
-                    or entry.state.status in {DownloadStatus.PAUSED, DownloadStatus.SCHEDULED}
+                    or entry.state.status in {DownloadStatus.PAUSED, DownloadStatus.NEW}
                 )
                 if handle in self._outstanding_tasks:
                     self._outstanding_tasks[handle].join()
@@ -624,31 +586,10 @@ class DownloadManager(DownloadListenerBase):
             return request.future_result.get()
         return request.future_result
 
-    def _run_later(
-        self,
-        start_at: datetime,
-        handler: Callable,
-        args: tuple | None = None,
-        kwargs: dict[str, Any] | None = None,
-    ):
-        return self._scheduler.schedule(
-            at=start_at,
-            action=partial(
-                self._run_soon,
-                handler=handler,
-                args=args,
-                kwargs=kwargs,
-                blocking=False,
-            ),
-        )
-
     def _stop_outstanding_tasks(self):
         logger.info("stopping all outstanding tasks")
         for entry in self._db.get_all_entries():
-            if entry.state.can_be_rescheduled:
-                self._scheduler.cancel(required_value(entry.state.schedule_handle))
-                entry.state.schedule_handle = None
-            elif entry.state.can_be_paused:
+            if entry.state.can_be_paused:
                 logger.info(f"pausing task {entry.handle}")
                 self._run_soon(self._handle_pause_download, args=(entry.handle,))
             elif entry.state.can_be_stopped:
@@ -711,15 +652,12 @@ class DownloadManager(DownloadListenerBase):
 
     def run(self):
         logger.info("download manager requested to run")
-        self._scheduler.start()
         self._listener_bridge.start()
         self._request_loop()
         logger.info("stopping download listener bridge")
         self._listener_bridge.stop()
         self._listener_bridge.join()
         logger.info("stopping internal scheduler")
-        self._scheduler.stop()
-        self._scheduler.join()
         logger.info("persisting download manager state")
         for entry in self._db.get_all_entries():
             entry.user_request.strip_credentials()

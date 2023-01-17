@@ -209,9 +209,6 @@ export const DownloadsTable: FunctionComponent<DownloadsTableProps> = ({download
                   {payload.file_name}
                 </TableCell>
                 <TableCell>
-                  {(downloadStatus === "SCHEDULED" && payload.time_scheduled !== null) &&
-                    `Will start on ${formatDate(new Date(payload.time_scheduled), 'MM/dd/yyyy hh:mm a')}`
-                  }
                   {(payload.progress_pc !== null) &&
                     <LinearProgress variant="determinate"
                                     value={payload.progress_pc * 100} />

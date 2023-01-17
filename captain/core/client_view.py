@@ -1,5 +1,3 @@
-from datetime import datetime
-
 from pydantic import BaseModel
 
 from .domain import DownloadEntry as InternalDownloadEntry
@@ -22,8 +20,6 @@ def _get_valid_actions(state: InternalDownloadState):
         actions.append("S")
     if state.can_be_retried:
         actions.append("rt")
-    if state.can_be_rescheduled:
-        actions.append("rs")
     if state.can_be_downloaded:
         actions.append("d")
     if state.can_be_removed:
@@ -48,7 +44,6 @@ class DownloadEntry(BaseModel):
     is_final: bool
     progress_pc: float | None
     current_rate: float | None
-    time_scheduled: datetime | None
     error_message: str | None
     valid_actions: list[str]
     download_method: str
@@ -57,12 +52,11 @@ class DownloadEntry(BaseModel):
     def from_internal(entry: InternalDownloadEntry) -> "DownloadEntry":
         return DownloadEntry(
             handle=str(entry.handle),
-            file_name=_get_file_name(entry),
+            file_name=entry.download_description,
             status=entry.state.status.name,
             is_final=entry.state.is_final,
             progress_pc=_get_download_progress_pc(entry.state),
             current_rate=entry.state.current_rate,
-            time_scheduled=entry.user_request.start_at,
             error_message=_get_error_message(entry.state),
             valid_actions=_get_valid_actions(entry.state),
             download_method=entry.user_request.download_method.method,
