@@ -40,3 +40,4 @@ class DownloadManagerSettings(BaseModel):
     persistence_settings: Annotated[PersistenceSettingsType, Field(discriminator="persistence_type")]
     logging_settings: LoggingSettings = Field(default_factory=LoggingSettings)
     max_outstanding_tasks: int | None = None
+    rtorrent_rpc_url: str | None = None

@@ -23,7 +23,8 @@ import {
   AuthMethod,
   DownloadMethod,
   YoutubeDownloadMethod,
-  HttpDownloadMethod
+  HttpDownloadMethod,
+  TorrentDownloadMethod
 } from "./domain"
 import FolderOpenIcon from '@mui/icons-material/FolderOpen';
 import { Controller } from "./controller"
@@ -77,17 +78,28 @@ function makeHttpDownloadMethod(formData: FormData): HttpDownloadMethod {
   }
 }
 
-function makeDownloadMethod(formData: FormData): DownloadMethod {
+function makeTorrentDownloadMethod(formData: FormData, settings: AppSettings): TorrentDownloadMethod {
+  return {
+    method: "torrent",
+    magnet_link: formData.remoteFileUrl,
+    rtorrent_rpc_url: settings.rtorrent_rpc_url
+  }
+}
+
+function makeDownloadMethod(formData: FormData, settings: AppSettings): DownloadMethod {
+  if (formData.remoteFileUrl.startsWith("magnet:")) {
+    return makeTorrentDownloadMethod(formData, settings)
+  }
   if (formData.remoteFileUrl.includes("youtube.")) {
     return makeYoutubeDownloadMethod(formData);
   }
   return makeHttpDownloadMethod(formData);
 }
 
-function makeDownloadRequest(formData: FormData): DownloadRequest {
+function makeDownloadRequest(formData: FormData, settings: AppSettings): DownloadRequest {
   return {
     download_dir: formData.downloadDir,
-    download_method: makeDownloadMethod(formData)
+    download_method: makeDownloadMethod(formData, settings)
   }
 }
 
@@ -180,7 +192,7 @@ export const StartDownload: FunctionComponent<StartDownloadProps> = ({onStart, o
     }
     else {
       resetForm();
-      onStart(makeDownloadRequest(formData.download as FormData));
+      onStart(makeDownloadRequest(formData.download as FormData, settings));
     }
   };
 

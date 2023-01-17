@@ -13,6 +13,7 @@ download_directories:
 max_outstanding_tasks: 1
 shutdown_timeout: 10
 send_files_to_trash: true
+rtorrent_rpc_url: 'http://127.0.0.1:8000'
 persistence_settings:
   persistence_type: in_memory
   database_file_path: ~/.captain/db.json

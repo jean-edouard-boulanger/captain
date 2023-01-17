@@ -13,7 +13,7 @@ export interface BasicCredentials extends AuthMethodBase<"basic"> {
 
 export type AuthMethod = BasicCredentials
 
-export const ALL_DOWNLOAD_METHOD_TYPES = ["http", "youtube"] as const
+export const ALL_DOWNLOAD_METHOD_TYPES = ["http", "youtube", "torrent"] as const
 type DownloadMethodTypesTuple = typeof ALL_DOWNLOAD_METHOD_TYPES;
 export type DownloadMethodTypes = DownloadMethodTypesTuple[number];
 
@@ -30,7 +30,12 @@ export interface YoutubeDownloadMethod extends DownloadMethodBase<"youtube">{
   remote_file_url: string;
 }
 
-export type DownloadMethod = HttpDownloadMethod | YoutubeDownloadMethod;
+export interface TorrentDownloadMethod extends DownloadMethodBase<"torrent">{
+  magnet_link: string;
+  rtorrent_rpc_url: string;
+}
+
+export type DownloadMethod = HttpDownloadMethod | YoutubeDownloadMethod | TorrentDownloadMethod;
 
 export interface DownloadRequest {
   download_dir: string;
@@ -45,6 +50,7 @@ export interface DownloadDirectory {
 
 export interface AppSettings {
   download_directories: Array<DownloadDirectory>;
+  rtorrent_rpc_url: string;
 }
 
 export enum ConnectState {

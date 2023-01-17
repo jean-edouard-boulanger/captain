@@ -1,4 +1,3 @@
-import os
 import traceback
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -102,7 +101,6 @@ class YoutubeDownloadTask(DownloadTaskBase, YoutubeDownloadListener):
                 "progress_hooks": [self._handle_youtube_notification],
                 "logger": logger,
             }
-            os.chdir(self._work_dir)
             with yt_dlp.YoutubeDL(ydl_options) as ydl:
                 ydl.download([self._request.remote_file_url])
             self._listener.download_complete(update_time=datetime.now(), handle=self._handle)
@@ -111,7 +109,7 @@ class YoutubeDownloadTask(DownloadTaskBase, YoutubeDownloadListener):
                 datetime.now(),
                 self._handle,
                 ErrorInfo(
-                    message=f"Could not download '{self._request.remote_file_name}': {e}",
+                    message=f"Could not download '{self._request.remote_file_url}': {e}",
                     stack=traceback.format_exc(),
                 ),
             )

@@ -1,4 +1,5 @@
 import multiprocessing
+import os
 import queue
 import signal
 import threading
@@ -11,6 +12,7 @@ from .domain import DownloadHandle, DownloadMetadata, DownloadRequest
 from .download_listener import MessageBasedDownloadListener
 from .download_task import DownloadTaskBase
 from .download_task_http import HttpDownloadTask
+from .download_task_torrent import TorrentDownloadTask
 from .download_task_youtube import YoutubeDownloadTask
 from .helpers import make_kwargs, set_thread_name
 from .logging import get_logger
@@ -36,7 +38,7 @@ class _Stop:
     pass
 
 
-DownloadTaskType: TypeAlias = HttpDownloadTask | YoutubeDownloadTask
+DownloadTaskType: TypeAlias = HttpDownloadTask | YoutubeDownloadTask | TorrentDownloadTask
 
 
 def _download_process_entrypoint(
@@ -50,6 +52,8 @@ def _download_process_entrypoint(
     task_type: type[DownloadTaskType],
 ) -> None:
     signal.signal(signal.SIGINT, signal.SIG_IGN)
+    assert work_dir.is_dir()
+    os.chdir(work_dir)
     download_task = task_type(
         handle=handle,
         download_request=download_request.download_method,
@@ -108,8 +112,7 @@ class DownloadProcessWrapper:
         logger.info(f"stopping download child process pid={self.pid} handle={self._handle} graceful={graceful}")
         if graceful and self._process.is_alive():
             self._message_queue.put(_Stop())
-            return
-        if self._process.is_alive():
+        elif self._process.is_alive():
             self.kill()
         self.join()
         self._listener.download_stopped(update_time=datetime.now(), handle=self._handle)
@@ -120,7 +123,7 @@ class DownloadProcessWrapper:
 
 
 def get_download_task_type(download_request: DownloadRequest) -> type[DownloadTaskType]:
-    tasks_mapping = {"http": HttpDownloadTask, "youtube": YoutubeDownloadTask}
+    tasks_mapping = {"http": HttpDownloadTask, "youtube": YoutubeDownloadTask, "torrent": TorrentDownloadTask}
     download_method = download_request.download_method.method
     task_type = tasks_mapping.get(download_method)
     if not task_type:

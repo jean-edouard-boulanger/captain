@@ -2,10 +2,11 @@ listen_url: 0.0.0.0
 listen_port: 4001
 temp_download_dir: /tmp
 download_directories:
-  - directory: ~/.captain/downloads/
+  - directory: /captain-downloads
     label: Downloads
 shutdown_timeout: 10
 send_files_to_trash: false
+rtorrent_rpc_url: 'http://rtorrent:8000'
 persistence_settings:
   persistence_type: in_memory
   database_file_path: ~/.captain/db.json

@@ -129,7 +129,6 @@ class HttpDownloadTask(DownloadTaskBase):
             progress_manager.next_slice()
         while True:
             if self._stopped_flag.is_set():
-                self._listener.download_stopped(datetime.now(), self._handle)
                 return
             next_chunk = _get_next_chunk(download_iter)
             progress_manager.report_progress(len(next_chunk) if next_chunk else 0)
@@ -157,7 +156,7 @@ class HttpDownloadTask(DownloadTaskBase):
                 datetime.now(),
                 self._handle,
                 ErrorInfo(
-                    message=f"Could not download '{self._request.remote_file_name}': {_format_error(e)}",
+                    message=f"Could not download '{self._request.remote_file_url}': {_format_error(e)}",
                     stack=traceback.format_exc(),
                 ),
             )
@@ -191,7 +190,7 @@ class HttpDownloadTask(DownloadTaskBase):
         try:
             self.run_impl()
         except Exception as e:
-            logger.error(f"while initializing download: {e}\n{traceback.format_exc()}")
+            logger.error("error while initializing download", exc_info=True)
             self._listener.download_errored(
                 datetime.now(),
                 self._handle,
@@ -202,5 +201,5 @@ class HttpDownloadTask(DownloadTaskBase):
             )
 
     def stop(self):
-        logger.info(f"task {self._handle} requested to stop")
+        logger.info(f"task {self._handle} ({type(self).__name__}) requested to stop")
         self._stopped_flag.set()

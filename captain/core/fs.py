@@ -1,5 +1,6 @@
 import os
 import shutil
+import zipfile
 from pathlib import Path
 
 from .errors import CaptainError
@@ -28,3 +29,9 @@ def remove_directory(path: Path):
     if not path.is_dir():
         raise FileSystemError(f"not a directory: {path}")
     shutil.rmtree(path)
+
+
+def create_zip_archive(archive_file_path: Path, source_dir: Path):
+    with zipfile.ZipFile(archive_file_path, "w") as zf:
+        for path in source_dir.rglob("*"):
+            zf.write(path, arcname=path.relative_to(source_dir))

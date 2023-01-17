@@ -8,6 +8,8 @@ services:
     working_dir: /captain/
     volumes:
       - ./:/captain/
+      - 'rtorrent_downloads:/downloads'
+      - 'captain_downloads:/captain-downloads'
   webapp:
     build: .
     ports:
@@ -18,3 +20,15 @@ services:
     volumes:
       - ./web:/captain/web/
       - /captain/web/node_modules/
+  rtorrent:
+    image: crazymax/rtorrent-rutorrent:latest
+    ports:
+      - '8000:8000'
+      - '8080:8080'
+    volumes:
+      - 'rtorrent_downloads:/downloads'
+      - './docker/data/rtorrent/.rtorrent.rc:/data/rtorrent/.rtorrent.rc'
+
+volumes:
+  rtorrent_downloads:
+  captain_downloads:

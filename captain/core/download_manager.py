@@ -456,7 +456,7 @@ class DownloadManager(DownloadListenerBase):
             self._db.remove_entry(handle)
             self._notify_observers(
                 NotificationSeverity.INFO,
-                f"Removed '{entry.user_request.remote_file_name}' from the list",
+                f"Removed '{entry.download_description}' from the list",
             )
             logger.debug(f"removed task: {handle}")
 
@@ -554,7 +554,7 @@ class DownloadManager(DownloadListenerBase):
                 )
                 self._notify_observers(
                     NotificationSeverity.INFO,
-                    f"Download '{entry.user_request.remote_file_name}' complete",
+                    f"Download '{entry.download_description}' complete",
                 )
                 logger.info(f"task {handle} complete")
                 remove_directory(entry.state.work_dir)
@@ -683,7 +683,7 @@ class DownloadManager(DownloadListenerBase):
                 logger.debug(f"request start: {request}")
                 result = request.handler(*request.args, **request.kwargs)
                 request.future_result.set_result(result)
-                logger.debug("request end [success]" + f": {result}" if result is not None else "")
+                logger.debug("request end [success]" + (f": {result}" if result is not None else ""))
             except Exception as e:
                 ref_code = _make_error_reference_code()
                 logger.error(

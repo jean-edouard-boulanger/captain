@@ -3,10 +3,12 @@ import os
 import uuid
 from datetime import datetime
 from pathlib import Path
-from typing import Annotated, Any, Literal, Union
+from typing import Annotated, Any, Literal, TypeAlias, Union
 from urllib.parse import unquote
 
 from pydantic import BaseModel, Field, SecretStr
+
+from captain.core.rtorrent_client import extract_magnet_link_info_hash
 
 
 class DownloadHandle(BaseModel):
@@ -67,7 +69,23 @@ class YoutubeDownloadRequest(BaseModel):
         self.auth = None
 
 
-DownloadMethodType = Union[HttpDownloadRequest, YoutubeDownloadRequest]
+class TorrentDownloadRequest(BaseModel):
+    method: Literal["torrent"] = "torrent"
+    magnet_link: str
+    rtorrent_rpc_url: str
+
+    @property
+    def remote_file_name(self) -> str:
+        try:
+            return extract_magnet_link_info_hash(self.magnet_link)
+        except Exception:
+            return self.magnet_link
+
+    def strip_credentials(self) -> None:
+        pass
+
+
+DownloadMethodType: TypeAlias = HttpDownloadRequest | YoutubeDownloadRequest | TorrentDownloadRequest
 DownloadMethodChoiceType = Annotated[DownloadMethodType, Field(discriminator="method")]
 
 
@@ -179,6 +197,12 @@ class DownloadEntry(BaseModel):
     handle: DownloadHandle
     user_request: DownloadRequest
     state: DownloadState
+
+    @property
+    def download_description(self):
+        if not self.state.metadata:
+            return self.user_request.remote_file_name
+        return self.state.metadata.downloaded_file_path.name
 
 
 class NotificationSeverity(str, enum.Enum):
